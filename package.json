@@ -1,0 +1,42 @@
+{
+  "name": "superset-plugin-chart-kpi-card",
+  "version": "0.1.0",
+  "description": "KPI Card visualization plugin for Apache Superset 6.0+ with plan/YoY comparisons, abs/pct toggle, and design system v2.0 theming",
+  "sideEffects": false,
+  "main": "src/index.ts",
+  "module": "src/index.ts",
+  "files": [
+    "esm",
+    "lib"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "keywords": [
+    "superset",
+    "chart",
+    "kpi",
+    "big-number"
+  ],
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "npm run build-cjs && npm run build-esm",
+    "build-cjs": "tsc --outDir lib --module commonjs",
+    "build-esm": "tsc --outDir esm --module esnext",
+    "dev": "tsc --watch --outDir esm --module esnext",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@superset-ui/chart-controls": "^0.20.0 || *",
+    "@superset-ui/core": "^0.20.0 || *"
+  },
+  "peerDependencies": {
+    "react": "^16.13.1 || ^17 || ^18",
+    "react-dom": "^16.13.1 || ^17 || ^18"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.0",
+    "typescript": "^5.0.0"
+  }
+}
