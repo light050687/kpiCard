@@ -269,13 +269,14 @@ const GRID_CSS = `
 }
 `;
 
-function KpiGrid({ isDarkMode }: { isDarkMode: boolean }) {
+function KpiGrid({ isDarkMode, withDetail }: { isDarkMode: boolean; withDetail?: boolean }) {
   const bg = isDarkMode ? '#0F1114' : '#F3F3F3';
+  const detail = withDetail ? { detailData: MOCK_DETAIL } : {};
   const cards: Array<Omit<KpiCardProps, 'width' | 'height' | 'theme'>> = [
-    { headerText: 'Выручка', toggleMode: 'abs_pct', toggleLabelAbs: '₽', toggleLabelPct: '%', absView: REVENUE_ABS, pctView: REVENUE_PCT, isDarkMode },
-    { headerText: 'Расходы', toggleMode: 'abs_pct', toggleLabelAbs: '₽', toggleLabelPct: '%', absView: EXPENSES_ABS, pctView: EXPENSES_PCT, isDarkMode },
-    { headerText: 'Маржа', toggleMode: 'abs_pct', toggleLabelAbs: '₽', toggleLabelPct: '%', absView: MARGIN_ABS, pctView: MARGIN_PCT, isDarkMode },
-    { headerText: 'Конверсия', toggleMode: 'abs_pct', toggleLabelAbs: 'абс', toggleLabelPct: '%', absView: CONVERSION_ABS, pctView: CONVERSION_PCT, isDarkMode },
+    { headerText: 'Выручка', toggleMode: 'abs_pct', toggleLabelAbs: '₽', toggleLabelPct: '%', absView: REVENUE_ABS, pctView: REVENUE_PCT, isDarkMode, ...detail },
+    { headerText: 'Расходы', toggleMode: 'abs_pct', toggleLabelAbs: '₽', toggleLabelPct: '%', absView: EXPENSES_ABS, pctView: EXPENSES_PCT, isDarkMode, ...detail },
+    { headerText: 'Маржа', toggleMode: 'abs_pct', toggleLabelAbs: '₽', toggleLabelPct: '%', absView: MARGIN_ABS, pctView: MARGIN_PCT, isDarkMode, ...detail },
+    { headerText: 'Конверсия', toggleMode: 'abs_pct', toggleLabelAbs: 'абс', toggleLabelPct: '%', absView: CONVERSION_ABS, pctView: CONVERSION_PCT, isDarkMode, ...detail },
   ];
 
   return (
@@ -298,6 +299,18 @@ export const GridLight = {
 
 export const GridDark = {
   render: () => <KpiGrid isDarkMode />,
+  parameters: { backgrounds: { default: 'dark' }, layout: 'fullscreen' },
+};
+
+/** Grid with detail — click any card to open drill-down modal */
+export const GridWithDetailLight = {
+  render: () => <KpiGrid isDarkMode={false} withDetail />,
+  parameters: { backgrounds: { default: 'light' }, layout: 'fullscreen' },
+};
+
+/** Grid with detail — dark theme */
+export const GridWithDetailDark = {
+  render: () => <KpiGrid isDarkMode withDetail />,
   parameters: { backgrounds: { default: 'dark' }, layout: 'fullscreen' },
 };
 
