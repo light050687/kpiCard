@@ -22,17 +22,8 @@ import {
 import DetailModal from './DetailModal';
 
 /* ── Counter animation ──────────────────────────────────────────────
- * Matches kpi-cards-v1.html mockup behavior: the integer part of the
- * hero value counts up from 0 → target.
- *
- * Mockup uses CSS @property + counter-reset (Houdini), which cannot
- * work inside Emotion styled-components. We replicate the same visual
- * effect with requestAnimationFrame.
- *
+ * The integer part of the hero value counts up from 0 → target.
  * Easing: cubic-bezier(.4,0,.2,1) ≈ easeOutQuart.
- * Duration scales with target magnitude (700ms–1200ms, matching
- * mockup's c1=1s c2=.8s c3=1.2s c4=.7s).
- * Delay: 250ms (mockup: .25s for first card).
  * ────────────────────────────────────────────────────────────────── */
 
 const COUNTER_DELAY_MS = 250;
@@ -45,11 +36,6 @@ function counterDuration(target: number): number {
   return Math.min(1200, 700 + target * 30);
 }
 
-/** Extract first integer from formatted value string.
- *  "12,4 млрд" → { prefix: "", num: 12, suffix: ",4 млрд" }
- *  "₽ 8.7M"   → { prefix: "₽ ", num: 8, suffix: ".7M" }
- *  "+14,8%"    → { prefix: "+", num: 14, suffix: ",8%" }
- */
 function parseHeroInt(
   value: string,
 ): { prefix: string; num: number; suffix: string } | null {
@@ -90,7 +76,6 @@ function useCountUp(target: number, duration: number, delay: number): number {
   return current;
 }
 
-/** Hero number with counter animation (integer part counts up from 0). */
 function AnimatedHero({ value }: { value: string }): JSX.Element {
   const parsed = parseHeroInt(value);
   const target = parsed?.num ?? 0;
@@ -110,10 +95,7 @@ function AnimatedHero({ value }: { value: string }): JSX.Element {
   );
 }
 
-/* ── Toggle slide transition ───────────────────────────────────────
- * Inline style on DataLayer avoids Emotion class swap, matching
- * mockup's .kpi-layer.visible / .hidden / .exit-left pattern.
- * ────────────────────────────────────────────────────────────────── */
+/* ── Toggle slide transition ─────────────────────────────────────── */
 
 function layerStyle(
   visible: boolean,
@@ -156,35 +138,49 @@ function ViewContent({ view }: { view: KpiViewData }): JSX.Element {
 
 /* ── Main component ────────────────────────────────────────────── */
 
-/**
- * KPI Card — Main visualization component.
- *
- * Animation strategy (matching kpi-cards-v1.html mockup):
- *   • Entry: plain CSS @keyframes injected via <style> tag (card-in, sub-in, etc.)
- *   • Counter: JS requestAnimationFrame on hero integer (replaces CSS @property)
- *   • Toggle: inline style on DataLayer (translateX slide)
- *   • Hover: CSS transitions on title underline, value color, pill bg
- *   • Dark mode: data-theme attribute switches CSS custom properties
- */
 export default function KpiCard({
   width,
   height,
   headerText,
-  toggleMode,
-  toggleLabelAbs,
-  toggleLabelPct,
-  absView,
-  pctView,
+  modeCount,
+  toggleLabelA,
+  toggleLabelB,
+  modeAView,
+  modeBView,
+  colorSchemeA,
+  colorSchemeB,
+  enablePlan,
+  enableYoy,
+  hierarchyLabelPrimary,
+  hierarchyLabelSecondary,
   isDarkMode,
-  detailData,
+  detailDataRaw,
+  aggregationTypeA,
+  aggregationTypeB,
+  formatValueA,
+  formatValueB,
+  formatDelta,
+  detailTopN,
 }: KpiCardProps): JSX.Element {
-  const [activeMode, setActiveMode] = useState<'abs' | 'pct'>('abs');
+  const [activeMode, setActiveMode] = useState<'a' | 'b'>('a');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const isAbs = activeMode === 'abs';
+  const isA = activeMode === 'a';
+  const isDual = modeCount === 'dual';
 
-  const absStyle = layerStyle(isAbs, 'left');
-  const pctStyle = layerStyle(!isAbs, 'right');
+  // Filter comparisons based on enablePlan/enableYoy flags
+  const filterComparisons = (view: KpiViewData): KpiViewData => ({
+    ...view,
+    comparisons: view.comparisons.filter(cmp => {
+      if (cmp.type === 'plan' && !enablePlan) return false;
+      if (cmp.type === 'yoy' && !enableYoy) return false;
+      return true;
+    }),
+  });
+  const viewA = filterComparisons(modeAView);
+  const viewB = filterComparisons(modeBView);
+
+  const hasDetail = Boolean(detailDataRaw?.rows?.length);
 
   return (
     <KpiCardRoot
@@ -192,60 +188,69 @@ export default function KpiCard({
       height={height}
       data-theme={isDarkMode ? 'dark' : 'light'}
       role="figure"
-      aria-label={`${headerText}: ${absView.value}`}
+      aria-label={`${headerText}: ${modeAView.value}`}
     >
-      {/* Plain CSS @keyframes — bypasses Emotion/Stylis, guaranteed to work */}
+      {/* Plain CSS @keyframes — bypasses Emotion/Stylis */}
       {/* eslint-disable-next-line react/no-danger */}
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
 
       <Card
         className={CARD_CLASS}
-        onClick={detailData?.bySegment ? () => setIsModalOpen(true) : undefined}
-        style={detailData?.bySegment ? { cursor: 'pointer' } : undefined}
+        onClick={hasDetail ? () => setIsModalOpen(true) : undefined}
+        style={hasDetail ? { cursor: 'pointer' } : undefined}
       >
         <CardHead>
           <CardTitle>{headerText}</CardTitle>
-          {toggleMode === 'abs_pct' && (
-            <ToggleGroup role="tablist" aria-label="Toggle absolute / percentage">
+          {isDual && (
+            <ToggleGroup role="tablist" aria-label="Toggle mode A / B">
               <ToggleButton
-                active={isAbs}
+                active={isA}
                 role="tab"
-                aria-selected={isAbs}
-                onClick={e => { e.stopPropagation(); setActiveMode('abs'); }}
+                aria-selected={isA}
+                onClick={e => { e.stopPropagation(); setActiveMode('a'); }}
               >
-                {toggleLabelAbs}
+                {toggleLabelA}
               </ToggleButton>
               <ToggleButton
-                active={!isAbs}
+                active={!isA}
                 role="tab"
-                aria-selected={!isAbs}
-                onClick={e => { e.stopPropagation(); setActiveMode('pct'); }}
+                aria-selected={!isA}
+                onClick={e => { e.stopPropagation(); setActiveMode('b'); }}
               >
-                {toggleLabelPct}
+                {toggleLabelB}
               </ToggleButton>
             </ToggleGroup>
           )}
         </CardHead>
 
         <DataContainer>
-          <DataLayer style={absStyle} aria-hidden={!isAbs}>
-            <ViewContent view={absView} />
+          <DataLayer style={layerStyle(isA, 'left')} aria-hidden={!isA}>
+            <ViewContent view={viewA} />
           </DataLayer>
-          {toggleMode === 'abs_pct' && (
-            <DataLayer style={pctStyle} aria-hidden={isAbs}>
-              <ViewContent view={pctView} />
+          {isDual && (
+            <DataLayer style={layerStyle(!isA, 'right')} aria-hidden={isA}>
+              <ViewContent view={viewB} />
             </DataLayer>
           )}
         </DataContainer>
       </Card>
 
-      {detailData?.bySegment && (
+      {hasDetail && detailDataRaw && (
         <DetailModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           title={headerText}
-          headerValue={isAbs ? absView.value : pctView.value}
-          detailData={detailData}
+          headerValue={isA ? viewA.value : viewB.value}
+          detailDataRaw={detailDataRaw}
+          aggregationType={isA ? aggregationTypeA : aggregationTypeB}
+          colorScheme={isA ? colorSchemeA : colorSchemeB}
+          formatValue={isA ? formatValueA : formatValueB}
+          formatDelta={formatDelta}
+          hierarchyLabelPrimary={hierarchyLabelPrimary}
+          hierarchyLabelSecondary={hierarchyLabelSecondary}
+          enablePlan={enablePlan}
+          enableYoy={enableYoy}
+          topN={detailTopN}
           isDarkMode={isDarkMode}
         />
       )}

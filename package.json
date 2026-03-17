@@ -28,15 +28,25 @@
     "test": "jest"
   },
   "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
     "@superset-ui/chart-controls": "^0.20.0 || *",
-    "@superset-ui/core": "^0.20.0 || *"
+    "@superset-ui/core": "^0.20.0 || *",
+    "json-bigint": "^1.0.0",
+    "react-loadable": "^5.5.0",
+    "tinycolor2": "^1.6.0"
   },
   "peerDependencies": {
     "react": "^16.13.1 || ^17 || ^18",
     "react-dom": "^16.13.1 || ^17 || ^18"
   },
   "devDependencies": {
+    "@storybook/addon-essentials": "^8.6.14",
+    "@storybook/addon-webpack5-compiler-swc": "^4.0.2",
+    "@storybook/react": "^8.6.14",
+    "@storybook/react-webpack5": "^8.6.14",
     "@types/react": "^18.0.0",
+    "storybook": "^8.6.14",
     "typescript": "^5.0.0"
   }
 }

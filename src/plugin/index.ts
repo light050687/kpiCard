@@ -1,20 +1,17 @@
-import { ChartPlugin } from '@superset-ui/core';
+import { ChartPlugin, ChartMetadata } from '@superset-ui/core';
 import buildQuery from './buildQuery';
 import controlPanel from './controlPanel';
 import transformProps from './transformProps';
 import thumbnail from '../images/thumbnail.png';
-import { KpiCardFormData, KpiCardProps } from '../types';
+import { KpiCardFormData } from '../types';
 
-export default class SupersetPluginChartKpiCard extends ChartPlugin<
-  KpiCardFormData,
-  KpiCardProps
-> {
+export default class SupersetPluginChartKpiCard extends ChartPlugin<KpiCardFormData> {
   constructor() {
     super({
       buildQuery,
       controlPanel,
       loadChart: () => import('../KpiCard'),
-      metadata: {
+      metadata: new ChartMetadata({
         name: 'KPI Card',
         description:
           'Single KPI metric card with plan/YoY comparisons, abs/pct toggle, ' +
@@ -22,7 +19,7 @@ export default class SupersetPluginChartKpiCard extends ChartPlugin<
         thumbnail,
         tags: ['KPI', 'Big Number', 'Comparison', 'Featured'],
         category: 'KPI Indicators',
-      },
+      }),
       transformProps,
     });
   }

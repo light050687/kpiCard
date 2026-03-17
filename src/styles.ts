@@ -108,7 +108,8 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
 
   width: ${({ width }) => width}px;
   max-width: 100%;
-  height: ${({ height }) => height}px;
+  min-height: ${({ height }) => height}px;
+  height: auto;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -151,6 +152,7 @@ export const CardHead = styled.div`
   justify-content: space-between;
   align-items: center;
   margin-bottom: 12px;
+  min-height: 24px;
 `;
 
 export const CardTitle = styled.div`
@@ -477,6 +479,10 @@ export const ModalToolbar = styled.div`
   padding: 10px 20px;
   border-bottom: 1px solid var(--g100);
   flex-shrink: 0;
+
+  @media (max-width: 428px) {
+    flex-wrap: wrap;
+  }
 `;
 
 export const SearchBox = styled.div`
@@ -493,6 +499,11 @@ export const SearchBox = styled.div`
 
   &:focus-within {
     border-color: var(--g300);
+  }
+
+  @media (max-width: 428px) {
+    width: 100%;
+    max-width: none;
   }
 `;
 
@@ -566,6 +577,11 @@ export const FlipButton = styled.button`
     outline: 2px solid var(--c-sky);
     outline-offset: 2px;
   }
+
+  @media (max-width: 428px) {
+    width: 100%;
+    justify-content: center;
+  }
 `;
 
 export const FlipIcon = styled.span<{ flipped?: boolean }>`
@@ -591,11 +607,15 @@ export const ResultsCount = styled.span`
   font-variant-numeric: tabular-nums;
 `;
 
-/** Scrollable table area */
+/** Scrollable table area — hidden on mobile (≤428px) */
 export const TableWrap = styled.div`
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
+
+  @media (max-width: 428px) {
+    display: none;
+  }
 `;
 
 export const DetailTable = styled.table`

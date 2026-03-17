@@ -5,7 +5,15 @@ import React, {
   useRef,
   useMemo,
 } from 'react';
-import { DetailData, DetailGroup, DetailRow, HierarchyMode } from './types';
+import {
+  DetailDataRaw,
+  DetailGroup,
+  DetailRow,
+  HierarchyMode,
+  AggregationType,
+  ComparisonColorScheme,
+} from './types';
+import { aggregateDetailData } from './utils/aggregation';
 import {
   Overlay,
   Modal,
@@ -45,39 +53,27 @@ const CLOSE_DURATION_MS = 300;
 function exportToCsv(
   data: DetailGroup[],
   title: string,
-  hierarchy: HierarchyMode,
+  groupLabel: string,
+  childLabel: string,
+  enablePlan: boolean,
+  enableYoy: boolean,
 ): void {
   const BOM = '\uFEFF';
-  const groupLabel = hierarchy === 'segment' ? 'Сегмент' : 'Магазин';
-  const childLabel = hierarchy === 'segment' ? 'Магазин' : 'Сегмент';
-  const headers = [
-    groupLabel,
-    childLabel,
-    'Факт',
-    'План',
-    'Δ План',
-    'ПГ',
-    'Δ ПГ',
-  ];
+  const headers = [groupLabel, childLabel, 'Факт'];
+  if (enablePlan) headers.push('План', 'Δ План');
+  if (enableYoy) headers.push('ПГ', 'Δ ПГ');
 
   const rows: string[][] = [];
   for (const group of data) {
     for (const child of group.children) {
-      rows.push([
-        group.name,
-        child.name,
-        child.value,
-        child.planValue ?? '',
-        child.planDelta ?? '',
-        child.prevValue ?? '',
-        child.prevDelta ?? '',
-      ]);
+      const row = [group.name, child.name, child.value];
+      if (enablePlan) row.push(child.planValue ?? '', child.planDelta ?? '');
+      if (enableYoy) row.push(child.prevValue ?? '', child.prevDelta ?? '');
+      rows.push(row);
     }
   }
 
-  const escape = (cell: string): string =>
-    `"${cell.replace(/"/g, '""')}"`;
-
+  const escape = (cell: string): string => `"${cell.replace(/"/g, '""')}"`;
   const csv =
     BOM +
     [headers, ...rows].map(row => row.map(escape).join(';')).join('\n');
@@ -91,7 +87,7 @@ function exportToCsv(
   URL.revokeObjectURL(url);
 }
 
-/* ── Search icon SVG — matches mockup: 13×13, viewBox 0 0 16 16 ── */
+/* ── Search icon SVG ── */
 
 function MagnifyIcon(): JSX.Element {
   return (
@@ -111,7 +107,7 @@ function MagnifyIcon(): JSX.Element {
   );
 }
 
-/* ── Table row rendering — 6 columns: Name | Факт | План | Δ | ПГ | Δ ── */
+/* ── Table cell helpers ── */
 
 function DeltaCell({
   delta,
@@ -132,72 +128,102 @@ function GroupRowView({
   group,
   expanded,
   onToggle,
+  enablePlan,
+  enableYoy,
 }: {
   group: DetailGroup;
   expanded: boolean;
   onToggle: () => void;
+  enablePlan: boolean;
+  enableYoy: boolean;
 }): JSX.Element {
   const { summary } = group;
   return (
     <GroupRow onClick={onToggle}>
       <td>
-        <Chevron expanded={expanded} aria-hidden="true">
-          ▶
-        </Chevron>
+        <Chevron expanded={expanded} aria-hidden="true">▶</Chevron>
         {group.name}
       </td>
       <td className="r">{summary.value}</td>
-      <td className="r">{summary.planValue ?? ''}</td>
-      <DeltaCell delta={summary.planDelta} status={summary.planStatus} />
-      <td className="r">{summary.prevValue ?? ''}</td>
-      <DeltaCell delta={summary.prevDelta} status={summary.prevStatus} />
+      {enablePlan && <td className="r">{summary.planValue ?? ''}</td>}
+      {enablePlan && (
+        <DeltaCell delta={summary.planDelta} status={summary.planStatus} />
+      )}
+      {enableYoy && <td className="r">{summary.prevValue ?? ''}</td>}
+      {enableYoy && (
+        <DeltaCell delta={summary.prevDelta} status={summary.prevStatus} />
+      )}
     </GroupRow>
   );
 }
 
-function ChildRowView({ row }: { row: DetailRow }): JSX.Element {
+function ChildRowView({
+  row,
+  enablePlan,
+  enableYoy,
+}: {
+  row: DetailRow;
+  enablePlan: boolean;
+  enableYoy: boolean;
+}): JSX.Element {
   return (
     <ChildRow>
       <td>{row.name}</td>
       <td className="r">{row.value}</td>
-      <td className="r">{row.planValue ?? ''}</td>
-      <DeltaCell delta={row.planDelta} status={row.planStatus} />
-      <td className="r">{row.prevValue ?? ''}</td>
-      <DeltaCell delta={row.prevDelta} status={row.prevStatus} />
+      {enablePlan && <td className="r">{row.planValue ?? ''}</td>}
+      {enablePlan && (
+        <DeltaCell delta={row.planDelta} status={row.planStatus} />
+      )}
+      {enableYoy && <td className="r">{row.prevValue ?? ''}</td>}
+      {enableYoy && (
+        <DeltaCell delta={row.prevDelta} status={row.prevStatus} />
+      )}
     </ChildRow>
   );
 }
 
-/* ── Main component ── */
+/* ── Props ── */
 
 interface DetailModalProps {
   isOpen: boolean;
   onClose: () => void;
   title: string;
   headerValue: string;
-  detailData: DetailData;
+  detailDataRaw: DetailDataRaw;
+  aggregationType: AggregationType;
+  colorScheme: ComparisonColorScheme;
+  formatValue: (n: number) => string;
+  formatDelta: (n: number) => string;
+  hierarchyLabelPrimary: string;
+  hierarchyLabelSecondary: string;
+  enablePlan: boolean;
+  enableYoy: boolean;
+  topN: number;
   isDarkMode: boolean;
 }
 
-/*
- * Detail drill-down modal.
- *
- * Renders inside KpiCardRoot (in KpiCard.tsx) so CSS custom properties
- * (--ink, --s, --g*, etc.) and keyframes are inherited — no portal needed.
- * Overlay uses position:fixed → positioned from viewport regardless of
- * DOM nesting. z-index:100 sits above all Superset dashboard content.
- */
+/* ── Main component ── */
+
 export default function DetailModal({
   isOpen,
   onClose,
   title,
   headerValue,
-  detailData,
+  detailDataRaw,
+  aggregationType,
+  colorScheme,
+  formatValue,
+  formatDelta,
+  hierarchyLabelPrimary,
+  hierarchyLabelSecondary,
+  enablePlan,
+  enableYoy,
+  topN,
 }: DetailModalProps): JSX.Element | null {
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [hierarchyMode, setHierarchyMode] =
-    useState<HierarchyMode>('segment');
+    useState<HierarchyMode>('primary');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(),
   );
@@ -205,7 +231,55 @@ export default function DetailModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const isSeg = hierarchyMode === 'segment';
+  const isPrimary = hierarchyMode === 'primary';
+
+  // Current hierarchy labels
+  const groupLabel = isPrimary ? hierarchyLabelPrimary : hierarchyLabelSecondary;
+  const childLabel = isPrimary ? hierarchyLabelSecondary : hierarchyLabelPrimary;
+
+  /* ── Aggregate raw data on hierarchy/mode change (Req #11) ── */
+
+  const aggregatedData = useMemo(
+    () =>
+      aggregateDetailData({
+        rows: detailDataRaw.rows,
+        groupByField: isPrimary ? 'primaryGroup' : 'secondaryGroup',
+        childField: isPrimary ? 'secondaryGroup' : 'primaryGroup',
+        aggregationType,
+        topN,
+        formatValue,
+        formatDelta,
+        colorScheme,
+        enablePlan,
+        enableYoy,
+      }),
+    [
+      detailDataRaw, isPrimary, aggregationType, topN,
+      formatValue, formatDelta, colorScheme, enablePlan, enableYoy,
+    ],
+  );
+
+  /* ── Search filtering ── */
+
+  const filteredData = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return aggregatedData;
+
+    return aggregatedData
+      .map(group => {
+        if (group.name.toLowerCase().includes(q)) return group;
+        const matchingChildren = group.children.filter(child =>
+          child.name.toLowerCase().includes(q),
+        );
+        if (matchingChildren.length > 0) {
+          return { ...group, children: matchingChildren };
+        }
+        return null;
+      })
+      .filter((g): g is DetailGroup => g !== null);
+  }, [aggregatedData, searchQuery]);
+
+  const groupCount = filteredData.length;
 
   /* ── Close with exit animation ── */
 
@@ -219,8 +293,6 @@ export default function DetailModal({
     }, CLOSE_DURATION_MS);
   }, [onClose]);
 
-  /* ── Backdrop click (only direct click, not bubbled) ── */
-
   const handleOverlayClick = useCallback(
     (e: React.MouseEvent): void => {
       if (e.target === e.currentTarget) handleClose();
@@ -232,7 +304,6 @@ export default function DetailModal({
 
   useEffect(() => {
     if (!isOpen) return undefined;
-
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') handleClose();
     };
@@ -255,10 +326,8 @@ export default function DetailModal({
         'button, input, [tabindex]:not([tabindex="-1"])',
       );
       if (!focusable?.length) return;
-
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
-
       if (e.shiftKey && document.activeElement === first) {
         e.preventDefault();
         last.focus();
@@ -270,43 +339,13 @@ export default function DetailModal({
     [],
   );
 
-  /* ── Data filtering ── */
-
-  const activeData =
-    (isSeg ? detailData?.bySegment : detailData?.byStore) ?? [];
-
-  const filteredData = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return activeData;
-
-    return activeData
-      .map(group => {
-        const groupMatches = group.name.toLowerCase().includes(q);
-        if (groupMatches) return group;
-
-        const matchingChildren = group.children.filter(child =>
-          child.name.toLowerCase().includes(q),
-        );
-        if (matchingChildren.length > 0) {
-          return { ...group, children: matchingChildren };
-        }
-        return null;
-      })
-      .filter((g): g is DetailGroup => g !== null);
-  }, [activeData, searchQuery]);
-
-  const groupCount = filteredData.length;
-
   /* ── Group expand/collapse ── */
 
   const toggleGroup = useCallback((name: string): void => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
-      if (next.has(name)) {
-        next.delete(name);
-      } else {
-        next.add(name);
-      }
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
       return next;
     });
   }, []);
@@ -314,9 +353,7 @@ export default function DetailModal({
   /* ── Hierarchy flip ── */
 
   const flipHierarchy = useCallback((): void => {
-    setHierarchyMode(prev =>
-      prev === 'segment' ? 'store' : 'segment',
-    );
+    setHierarchyMode(prev => (prev === 'primary' ? 'secondary' : 'primary'));
     setExpandedGroups(new Set());
     setSearchQuery('');
   }, []);
@@ -324,12 +361,29 @@ export default function DetailModal({
   /* ── Export ── */
 
   const handleExport = useCallback((): void => {
-    exportToCsv(filteredData, title, hierarchyMode);
-  }, [filteredData, title, hierarchyMode]);
+    exportToCsv(filteredData, title, groupLabel, childLabel, enablePlan, enableYoy);
+  }, [filteredData, title, groupLabel, childLabel, enablePlan, enableYoy]);
+
+  /* ── Compute column count for table-layout ── */
+
+  const colCount = 2 + (enablePlan ? 2 : 0) + (enableYoy ? 2 : 0);
+
+  // Column widths based on visible columns
+  const nameWidth = colCount <= 4 ? '40%' : '30%';
+  const valWidth = colCount <= 4 ? '20%' : '14%';
+  const deltaWidth = colCount <= 4 ? '15%' : '10%';
 
   /* ── Render guard ── */
 
   if (!isOpen && !isClosing) return null;
+
+  // Abbreviated labels for mode toggle buttons
+  const primaryShort = hierarchyLabelPrimary.length > 4
+    ? hierarchyLabelPrimary.slice(0, 4)
+    : hierarchyLabelPrimary;
+  const secondaryShort = hierarchyLabelSecondary.length > 3
+    ? hierarchyLabelSecondary.slice(0, 3)
+    : hierarchyLabelSecondary;
 
   return (
     <Overlay closing={isClosing} onClick={handleOverlayClick}>
@@ -361,25 +415,23 @@ export default function DetailModal({
             <MagnifyIcon />
             <SearchInput
               type="text"
-              placeholder={
-                isSeg ? 'Поиск по сегменту...' : 'Поиск по магазину...'
-              }
+              placeholder={`Поиск по ${groupLabel.toLowerCase()}...`}
               aria-label="Поиск"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
             <ModeToggle>
               <ModeButton
-                active={isSeg}
-                onClick={() => setHierarchyMode('segment')}
+                active={isPrimary}
+                onClick={() => setHierarchyMode('primary')}
               >
-                Сегм
+                {primaryShort}
               </ModeButton>
               <ModeButton
-                active={!isSeg}
-                onClick={() => setHierarchyMode('store')}
+                active={!isPrimary}
+                onClick={() => setHierarchyMode('secondary')}
               >
-                Маг
+                {secondaryShort}
               </ModeButton>
             </ModeToggle>
           </SearchBox>
@@ -388,30 +440,36 @@ export default function DetailModal({
             onClick={flipHierarchy}
             aria-label="Сменить иерархию"
           >
-            <FlipIcon flipped={!isSeg} aria-hidden="true">
-              ⇅
-            </FlipIcon>
+            <FlipIcon flipped={!isPrimary} aria-hidden="true">⇅</FlipIcon>
             <FlipLabel>
-              {isSeg ? 'Сегмент\u00A0→\u00A0Магазин' : 'Магазин\u00A0→\u00A0Сегмент'}
+              {isPrimary
+                ? `${hierarchyLabelPrimary}\u00A0→\u00A0${hierarchyLabelSecondary}`
+                : `${hierarchyLabelSecondary}\u00A0→\u00A0${hierarchyLabelPrimary}`}
             </FlipLabel>
           </FlipButton>
 
           <ResultsCount>{groupCount} групп</ResultsCount>
         </ModalToolbar>
 
-        {/* ── Table — 6 columns ── */}
+        {/* ── Table — dynamic columns ── */}
         <TableWrap>
           <DetailTable>
             <THead>
               <THRow>
-                <th style={{ width: '30%' }}>
-                  {isSeg ? 'Сегмент' : 'Магазин'}
-                </th>
-                <th className="r" style={{ width: '14%' }}>Факт</th>
-                <th className="r" style={{ width: '14%' }}>План</th>
-                <th className="r" style={{ width: '10%' }}>Δ</th>
-                <th className="r" style={{ width: '14%' }}>ПГ</th>
-                <th className="r" style={{ width: '10%' }}>Δ</th>
+                <th style={{ width: nameWidth }}>{groupLabel}</th>
+                <th className="r" style={{ width: valWidth }}>Факт</th>
+                {enablePlan && (
+                  <th className="r" style={{ width: valWidth }}>План</th>
+                )}
+                {enablePlan && (
+                  <th className="r" style={{ width: deltaWidth }}>Δ</th>
+                )}
+                {enableYoy && (
+                  <th className="r" style={{ width: valWidth }}>ПГ</th>
+                )}
+                {enableYoy && (
+                  <th className="r" style={{ width: deltaWidth }}>Δ</th>
+                )}
               </THRow>
             </THead>
             <tbody>
@@ -423,12 +481,16 @@ export default function DetailModal({
                       group={group}
                       expanded={isExpanded}
                       onToggle={() => toggleGroup(group.name)}
+                      enablePlan={enablePlan}
+                      enableYoy={enableYoy}
                     />
                     {isExpanded &&
                       group.children.map(child => (
                         <ChildRowView
                           key={child.name}
                           row={child}
+                          enablePlan={enablePlan}
+                          enableYoy={enableYoy}
                         />
                       ))}
                   </React.Fragment>
@@ -442,7 +504,20 @@ export default function DetailModal({
         <ModalFoot>
           <FooterHint>▶ раскрыть детализацию</FooterHint>
           <ExportButton onClick={handleExport} aria-label="Экспорт данных">
-            ↓ Экспорт
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 16 16"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M8 2v9M4 7.5 8 11l4-3.5M3 14h10" />
+            </svg>
+            {' '}Экспорт
           </ExportButton>
         </ModalFoot>
       </Modal>
