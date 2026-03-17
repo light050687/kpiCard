@@ -424,6 +424,11 @@ export const ModalHead = styled.div`
   padding: 16px 20px;
   border-bottom: 1px solid var(--g100);
   flex-shrink: 0;
+
+  @media (max-width: 428px) {
+    padding: 12px 14px;
+    gap: 8px;
+  }
 `;
 
 export const ModalTitle = styled.span`
@@ -607,14 +612,15 @@ export const ResultsCount = styled.span`
   font-variant-numeric: tabular-nums;
 `;
 
-/** Scrollable table area — hidden on mobile (≤428px) */
+/** Scrollable table area — horizontally scrollable on mobile */
 export const TableWrap = styled.div`
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
 
   @media (max-width: 428px) {
-    display: none;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 `;
 
@@ -622,6 +628,11 @@ export const DetailTable = styled.table`
   width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
+
+  @media (max-width: 428px) {
+    min-width: 580px;
+    table-layout: auto;
+  }
 `;
 
 export const THead = styled.thead`
@@ -648,6 +659,13 @@ export const THRow = styled.tr`
 
   & > th.r {
     text-align: right;
+  }
+
+  @media (max-width: 428px) {
+    & > th {
+      padding: 8px 8px;
+      font-size: 10px;
+    }
   }
 `;
 
@@ -677,6 +695,17 @@ export const GroupRow = styled.tr`
     font-size: 12px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 428px) {
+    & > td {
+      padding: 8px 8px;
+      font-size: 12px;
+      line-height: 18px;
+    }
+    & > td.r {
+      font-size: 11px;
+    }
   }
 `;
 
@@ -708,6 +737,20 @@ export const ChildRow = styled.tr`
     font-size: 12px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
+  }
+
+  @media (max-width: 428px) {
+    & > td {
+      padding: 8px 8px;
+      font-size: 11px;
+      line-height: 18px;
+    }
+    & > td:first-of-type {
+      padding-left: 28px;
+    }
+    & > td.r {
+      font-size: 11px;
+    }
   }
 `;
 
@@ -754,6 +797,10 @@ export const ModalFoot = styled.div`
   padding: 10px 20px;
   border-top: 1px solid var(--g100);
   flex-shrink: 0;
+
+  @media (max-width: 428px) {
+    padding: 8px 14px;
+  }
 `;
 
 export const FooterHint = styled.span`
