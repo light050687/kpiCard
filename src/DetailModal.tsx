@@ -26,6 +26,8 @@ import {
   SearchBox,
   SearchIcon,
   SearchInput,
+  SearchScopeToggle,
+  SearchScopeButton,
   FlipButton,
   FlipIcon,
   FlipLabel,
@@ -46,6 +48,8 @@ import {
 /* ── Constants ── */
 
 const CLOSE_DURATION_MS = 300;
+
+type SearchScope = 'group' | 'child';
 
 /* ── CSV Export ── */
 
@@ -233,6 +237,7 @@ export default function DetailModal({
 }: DetailModalProps): JSX.Element | null {
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('group');
   const [hierarchyMode, setHierarchyMode] =
     useState<HierarchyMode>('primary');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
@@ -278,18 +283,22 @@ export default function DetailModal({
     ],
   );
 
-  /* ── Search filtering (searches both groups and children) ── */
+  /* ── Search filtering (by scope: group or child) ── */
 
   const filteredData = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return aggregatedData;
 
+    if (searchScope === 'group') {
+      // Search by group name only — matching group shows all children
+      return aggregatedData.filter(group =>
+        group.name.toLowerCase().includes(q),
+      );
+    }
+
+    // searchScope === 'child' — search by child name only
     return aggregatedData
       .map(group => {
-        // If group name matches, show it with all children
-        if (group.name.toLowerCase().includes(q)) return group;
-
-        // Otherwise, filter children by match
         const matchingChildren = group.children.filter(child =>
           child.name.toLowerCase().includes(q),
         );
@@ -299,7 +308,7 @@ export default function DetailModal({
         return null;
       })
       .filter((g): g is DetailGroup => g !== null);
-  }, [aggregatedData, searchQuery]);
+  }, [aggregatedData, searchQuery, searchScope]);
 
   const groupCount = filteredData.length;
 
@@ -310,6 +319,7 @@ export default function DetailModal({
     setTimeout(() => {
       setIsClosing(false);
       setSearchQuery('');
+      setSearchScope('group');
       setExpandedGroups(new Set());
       onClose();
     }, CLOSE_DURATION_MS);
@@ -435,6 +445,23 @@ export default function DetailModal({
               onChange={e => setSearchQuery(e.target.value)}
             />
           </SearchBox>
+
+          <SearchScopeToggle>
+            <SearchScopeButton
+              active={searchScope === 'group'}
+              onClick={() => setSearchScope('group')}
+              aria-label={`Поиск по ${groupLabel}`}
+            >
+              {groupLabel}
+            </SearchScopeButton>
+            <SearchScopeButton
+              active={searchScope === 'child'}
+              onClick={() => setSearchScope('child')}
+              aria-label={`Поиск по ${childLabel}`}
+            >
+              {childLabel}
+            </SearchScopeButton>
+          </SearchScopeToggle>
 
           <FlipButton
             onClick={flipHierarchy}

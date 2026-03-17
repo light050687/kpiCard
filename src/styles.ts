@@ -393,14 +393,16 @@ export const Overlay = styled.div<{ closing?: boolean }>`
   animation: kpi-overlay-in 0.25s ${EASE} both;
 `;
 
-/** Modal container */
+/** Modal container — responsive with min/max constraints and scroll */
 export const Modal = styled.div<{ closing?: boolean }>`
   background: var(--s);
   border: 1px solid var(--g200);
   border-radius: 10px;
   width: 92%;
   max-width: 960px;
+  min-width: 600px;
   max-height: 85vh;
+  min-height: 300px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -410,9 +412,28 @@ export const Modal = styled.div<{ closing?: boolean }>`
   transition: transform 0.3s ${EASE}, opacity 0.3s ${EASE};
   animation: kpi-modal-in 0.3s ${EASE} both;
 
+  /* Desktop small */
+  @media (max-width: 1024px) {
+    max-width: 800px;
+    min-width: 500px;
+  }
+
+  /* Tablet */
+  @media (max-width: 768px) {
+    width: 96%;
+    max-width: 700px;
+    min-width: 380px;
+    max-height: 88vh;
+  }
+
+  /* Mobile */
   @media (max-width: 428px) {
     width: 98%;
-    max-height: 90vh;
+    max-width: none;
+    min-width: 320px;
+    max-height: 92vh;
+    min-height: 260px;
+    border-radius: 8px;
   }
 `;
 
@@ -533,6 +554,33 @@ export const SearchInput = styled.input`
   }
 `;
 
+/** Segmented toggle for search scope (by group / by child) */
+export const SearchScopeToggle = styled.div`
+  display: flex;
+  gap: 1px;
+  background: var(--g100);
+  border-radius: 5px;
+  padding: 2px;
+  flex-shrink: 0;
+`;
+
+export const SearchScopeButton = styled.button<{ active: boolean }>`
+  border: none;
+  background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
+  font-family: var(--m);
+  font-size: 10px;
+  font-weight: 600;
+  color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g500)')};
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.12s ${EASE};
+  line-height: 1;
+  white-space: nowrap;
+  box-shadow: ${({ active }) =>
+    active ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'};
+`;
+
 export const ModeToggle = styled.div`
   display: flex;
   gap: 1px;
@@ -612,27 +660,19 @@ export const ResultsCount = styled.span`
   font-variant-numeric: tabular-nums;
 `;
 
-/** Scrollable table area — horizontally scrollable on mobile */
+/** Scrollable table area — both axes scroll when content overflows */
 export const TableWrap = styled.div`
   flex: 1;
   overflow-y: auto;
-  overflow-x: hidden;
-
-  @media (max-width: 428px) {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 `;
 
 export const DetailTable = styled.table`
   width: 100%;
+  min-width: 580px;
   border-collapse: collapse;
-  table-layout: fixed;
-
-  @media (max-width: 428px) {
-    min-width: 580px;
-    table-layout: auto;
-  }
+  table-layout: auto;
 `;
 
 export const THead = styled.thead`
