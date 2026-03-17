@@ -9,6 +9,7 @@ import {
   KpiViewData,
   ComparisonItem,
   DeltaStatus,
+  DeltaFormat,
   ComparisonColorScheme,
   AggregationType,
   DetailDataRaw,
@@ -18,7 +19,7 @@ import {
   formatRussianSmart,
   formatRussianPercent,
   formatRussianPP,
-  formatRussianDeltaAbs,
+  formatDeltaByFormat,
 } from '../utils/formatRussian';
 
 // ═══════════════════════════════════════
@@ -93,89 +94,81 @@ function createDeltaFormatter(
 
 interface ModeViewParams {
   mainValue: number;
-  planValue: number | null;
-  prevValue: number | null;
+  comp1Value: number | null;
+  comp2Value: number | null;
   aggregationType: AggregationType;
-  colorScheme: ComparisonColorScheme;
+  colorScheme1: ComparisonColorScheme;
+  colorScheme2: ComparisonColorScheme;
   valueFmt: ValueFormatter;
   subtitle: string;
-  enablePlan: boolean;
-  enableYoy: boolean;
-  planLabel: string;
-  yoyLabel: string;
+  enableComp1: boolean;
+  enableComp2: boolean;
+  comp1Label: string;
+  comp2Label: string;
+  deltaFormat1: DeltaFormat;
+  deltaFormat2: DeltaFormat;
   autoRussian: boolean;
+}
+
+/** Format a delta: 'auto' resolves by aggregationType, anything else is literal suffix */
+function formatDeltaByType(
+  diff: number,
+  ref: number,
+  fmt: DeltaFormat,
+  aggType: AggregationType,
+): string {
+  const effective =
+    fmt === 'auto'
+      ? aggType === 'PERCENT'
+        ? 'pp'
+        : 'percent'
+      : fmt;
+  return formatDeltaByFormat(diff, ref, effective);
 }
 
 function buildModeView(params: ModeViewParams): KpiViewData {
   const {
-    mainValue, planValue, prevValue,
-    aggregationType, colorScheme, valueFmt, subtitle,
-    enablePlan, enableYoy, planLabel, yoyLabel, autoRussian,
+    mainValue, comp1Value, comp2Value,
+    aggregationType, colorScheme1, colorScheme2, valueFmt, subtitle,
+    enableComp1, enableComp2, comp1Label, comp2Label, deltaFormat1, deltaFormat2, autoRussian,
   } = params;
 
   const comparisons: ComparisonItem[] = [];
 
   // Determine hero value
   let heroValue: string;
-  if (aggregationType === 'PERCENT' && prevValue != null && prevValue !== 0) {
+  if (aggregationType === 'PERCENT' && comp2Value != null && comp2Value !== 0) {
     // PERCENT mode: hero shows the percentage change
-    const pctChange = (mainValue - prevValue) / prevValue;
+    const pctChange = (mainValue - comp2Value) / comp2Value;
     heroValue = formatRussianPercent(pctChange, true);
   } else {
     heroValue = valueFmt(mainValue);
   }
 
-  // ── Plan comparison ──
-  if (enablePlan && planValue != null) {
-    const planDelta = mainValue - planValue;
-    const status = getDeltaStatus(planDelta, colorScheme);
-
-    if (aggregationType === 'PERCENT') {
-      // Delta in percentage points
-      comparisons.push({
-        label: planLabel,
-        value: valueFmt(planValue),
-        delta: formatRussianPP(planDelta),
-        status,
-        type: 'plan',
-      });
-    } else {
-      const pctDelta = planValue !== 0 ? planDelta / planValue : 0;
-      comparisons.push({
-        label: planLabel,
-        value: valueFmt(planValue),
-        delta: autoRussian
-          ? formatRussianDeltaAbs(planDelta)
-          : formatRussianPercent(pctDelta, true),
-        status,
-        type: 'plan',
-      });
-    }
+  // ── Comparison 1 ──
+  if (enableComp1 && comp1Value != null) {
+    const delta = mainValue - comp1Value;
+    const status = getDeltaStatus(delta, colorScheme1);
+    comparisons.push({
+      label: comp1Label,
+      value: valueFmt(comp1Value),
+      delta: formatDeltaByType(delta, comp1Value, deltaFormat1, aggregationType),
+      status,
+      type: 'comp1',
+    });
   }
 
-  // ── YoY comparison ──
-  if (enableYoy && prevValue != null) {
-    const yoyDelta = mainValue - prevValue;
-    const status = getDeltaStatus(yoyDelta, colorScheme);
-
-    if (aggregationType === 'PERCENT') {
-      comparisons.push({
-        label: yoyLabel,
-        value: valueFmt(prevValue),
-        delta: formatRussianPP(yoyDelta),
-        status,
-        type: 'yoy',
-      });
-    } else {
-      const pctDelta = prevValue !== 0 ? yoyDelta / prevValue : 0;
-      comparisons.push({
-        label: yoyLabel,
-        value: valueFmt(prevValue),
-        delta: formatRussianPercent(pctDelta, true),
-        status,
-        type: 'yoy',
-      });
-    }
+  // ── Comparison 2 ──
+  if (enableComp2 && comp2Value != null) {
+    const delta = mainValue - comp2Value;
+    const status = getDeltaStatus(delta, colorScheme2);
+    comparisons.push({
+      label: comp2Label,
+      value: valueFmt(comp2Value),
+      delta: formatDeltaByType(delta, comp2Value, deltaFormat2, aggregationType),
+      status,
+      type: 'comp2',
+    });
   }
 
   return { value: heroValue, subtitle, comparisons };
@@ -189,7 +182,7 @@ function extractDetailRows(
   rows: Record<string, unknown>[],
   formData: KpiCardFormData,
   metricLabel: string,
-  planLabel: string | null,
+  comp1MetricLabel: string | null,
 ): DetailDataRaw {
   const primaryCol = formData.groupby_primary;
   const secondaryCol = formData.groupby_secondary;
@@ -203,8 +196,8 @@ function extractDetailRows(
       ? String(row[secondaryCol] ?? 'N/A')
       : 'Total',
     metricValue: Number(row[metricLabel] ?? 0),
-    planValue: planLabel ? Number(row[planLabel] ?? 0) : null,
-    prevValue: offsetKey ? Number(row[offsetKey] ?? 0) : null,
+    comp1Value: comp1MetricLabel ? Number(row[comp1MetricLabel] ?? 0) : null,
+    comp2Value: offsetKey ? Number(row[offsetKey] ?? 0) : null,
   }));
 
   return { rows: result };
@@ -221,15 +214,21 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
 
   // ── Defaults ──
   const autoRussian = formData.auto_format_russian ?? true;
-  const enablePlan = formData.enable_plan ?? true;
-  const enableYoy = formData.enable_yoy ?? true;
+  const enableComp1 = formData.enable_comp1 ?? true;
+  const enableComp2 = formData.enable_comp2 ?? true;
   const modeCount = formData.mode_count || 'dual';
   const aggregationTypeA = formData.aggregation_type_a || 'SUM';
   const aggregationTypeB = formData.aggregation_type_b || 'PERCENT';
-  const colorSchemeA = formData.color_scheme_a || 'green_up';
-  const colorSchemeB = formData.color_scheme_b || 'green_up';
-  const planLabel = formData.plan_label || 'План:';
-  const yoyLabel = formData.yoy_label || 'ПГ:';
+  const colorScheme1A = formData.color_scheme_1a || 'green_up';
+  const colorScheme1B = formData.color_scheme_1b || 'green_up';
+  const colorScheme2A = formData.color_scheme_2a || 'green_up';
+  const colorScheme2B = formData.color_scheme_2b || 'green_up';
+  const deltaFormat1A: DeltaFormat = formData.delta_format_1a || 'auto';
+  const deltaFormat2A: DeltaFormat = formData.delta_format_2a || 'auto';
+  const deltaFormat1B: DeltaFormat = formData.delta_format_1b || 'auto';
+  const deltaFormat2B: DeltaFormat = formData.delta_format_2b || 'auto';
+  const comp1Label = formData.comp1_label || 'План:';
+  const comp2Label = formData.comp2_label || 'ПГ:';
 
   // ── Formatters ──
   const formatValueA = createValueFormatter(formData.number_format_a, autoRussian);
@@ -241,41 +240,43 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const metricLabel = getMetricLabel(formData.metric);
   const mainValue = extractMetricValue(summaryData, metricLabel) ?? 0;
 
-  // Plan metric
-  const planMetricLabel =
-    enablePlan && formData.metric_plan
+  // Comp1 metric (e.g., plan/target)
+  const comp1MetricLabel =
+    enableComp1 && formData.metric_plan
       ? getMetricLabel(formData.metric_plan)
       : null;
-  const planValue = planMetricLabel
-    ? extractMetricValue(summaryData, planMetricLabel)
+  const comp1Value = comp1MetricLabel
+    ? extractMetricValue(summaryData, comp1MetricLabel)
     : null;
 
-  // Previous period value
+  // Comp2 value (e.g., previous period)
   const timeComp = formData.time_comparison;
-  let prevValue: number | null = null;
-  if (enableYoy && timeComp && timeComp !== 'none' && summaryData.length > 0) {
+  let comp2Value: number | null = null;
+  if (enableComp2 && timeComp && timeComp !== 'none' && summaryData.length > 0) {
     const offsetKey = `${metricLabel}__${timeComp}`;
-    prevValue = extractMetricValue(summaryData, offsetKey);
+    comp2Value = extractMetricValue(summaryData, offsetKey);
   }
 
   // ── Build Mode A view ──
   const modeAView = buildModeView({
-    mainValue, planValue, prevValue,
+    mainValue, comp1Value, comp2Value,
     aggregationType: aggregationTypeA,
-    colorScheme: colorSchemeA,
+    colorScheme1: colorScheme1A, colorScheme2: colorScheme2A,
     valueFmt: formatValueA,
     subtitle: formData.subtitle_a || '',
-    enablePlan, enableYoy, planLabel, yoyLabel, autoRussian,
+    enableComp1, enableComp2, comp1Label, comp2Label,
+    deltaFormat1: deltaFormat1A, deltaFormat2: deltaFormat2A, autoRussian,
   });
 
   // ── Build Mode B view ──
   const modeBView = buildModeView({
-    mainValue, planValue, prevValue,
+    mainValue, comp1Value, comp2Value,
     aggregationType: aggregationTypeB,
-    colorScheme: colorSchemeB,
+    colorScheme1: colorScheme1B, colorScheme2: colorScheme2B,
     valueFmt: formatValueB,
     subtitle: formData.subtitle_b || '',
-    enablePlan, enableYoy, planLabel, yoyLabel, autoRussian,
+    enableComp1, enableComp2, comp1Label, comp2Label,
+    deltaFormat1: deltaFormat1B, deltaFormat2: deltaFormat2B, autoRussian,
   });
 
   // ── Detail data (Query 1, if present) ──
@@ -284,7 +285,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     const detailRows = queriesData[1].data as Record<string, unknown>[];
     if (detailRows.length > 0) {
       detailDataRaw = extractDetailRows(
-        detailRows, formData, metricLabel, planMetricLabel,
+        detailRows, formData, metricLabel, comp1MetricLabel,
       );
     }
   }
@@ -301,8 +302,6 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
 
     // Mode
     modeCount,
-    modeAName: formData.mode_a_name || 'Рубли',
-    modeBName: formData.mode_b_name || 'Проценты',
     toggleLabelA: formData.toggle_label_a || '₽',
     toggleLabelB: formData.toggle_label_b || '%',
 
@@ -310,13 +309,23 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     modeAView,
     modeBView,
 
-    // Colors
-    colorSchemeA,
-    colorSchemeB,
+    // Color schemes (per comparison type × per mode)
+    colorScheme1A,
+    colorScheme1B,
+    colorScheme2A,
+    colorScheme2B,
+
+    // Delta format (per comparison type × per mode)
+    deltaFormat1A,
+    deltaFormat2A,
+    deltaFormat1B,
+    deltaFormat2B,
 
     // Comparisons
-    enablePlan,
-    enableYoy,
+    enableComp1,
+    enableComp2,
+    comp1Label,
+    comp2Label,
 
     // Hierarchy
     hierarchyLabelPrimary: formData.hierarchy_label_primary || 'Сегмент',

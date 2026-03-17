@@ -13,6 +13,9 @@ export type ComparisonColorScheme = 'green_up' | 'green_down';
 /** Aggregation strategy for numeric values */
 export type AggregationType = 'SUM' | 'PERCENT' | 'AVERAGE' | 'MAX' | 'MIN';
 
+/** How deltas are formatted — known keywords or arbitrary suffix text */
+export type DeltaFormat = 'auto' | 'percent' | 'pp' | 'absolute' | (string & {});
+
 /** Hierarchy grouping direction */
 export type HierarchyMode = 'primary' | 'secondary';
 
@@ -32,8 +35,6 @@ export interface KpiCardFormData extends QueryFormData {
 
   // ── Modes ──
   mode_count: 'single' | 'dual';
-  mode_a_name?: string;
-  mode_b_name?: string;
   toggle_label_a?: string;
   toggle_label_b?: string;
   subtitle_a?: string;
@@ -42,14 +43,24 @@ export interface KpiCardFormData extends QueryFormData {
   number_format_b?: string;
   aggregation_type_a: AggregationType;
   aggregation_type_b: AggregationType;
-  color_scheme_a: ComparisonColorScheme;
-  color_scheme_b: ComparisonColorScheme;
+
+  // ── Color schemes (per comparison type × per mode) ──
+  color_scheme_1a: ComparisonColorScheme;
+  color_scheme_1b: ComparisonColorScheme;
+  color_scheme_2a: ComparisonColorScheme;
+  color_scheme_2b: ComparisonColorScheme;
+
+  // ── Delta format (per comparison type × per mode) ──
+  delta_format_1a: DeltaFormat;
+  delta_format_2a: DeltaFormat;
+  delta_format_1b: DeltaFormat;
+  delta_format_2b: DeltaFormat;
 
   // ── Comparisons ──
-  enable_plan: boolean;
-  enable_yoy: boolean;
-  plan_label?: string;
-  yoy_label?: string;
+  enable_comp1: boolean;
+  enable_comp2: boolean;
+  comp1_label?: string;
+  comp2_label?: string;
   time_comparison?: string;
 
   // ── Detail / Drill-Down ──
@@ -64,14 +75,14 @@ export interface KpiCardFormData extends QueryFormData {
 // Display Data (transformProps → KpiCard)
 // ═══════════════════════════════════════
 
-/** Single comparison item (Plan or YoY row) */
+/** Single comparison item (generic — comp1 or comp2) */
 export interface ComparisonItem {
   label: string;
   value: string;
   delta: string;
   status: DeltaStatus;
-  /** Identifies comparison kind — used for enablePlan/enableYoy filtering */
-  type?: 'plan' | 'yoy';
+  /** Identifies comparison kind — used for enable/disable filtering */
+  type?: 'comp1' | 'comp2';
 }
 
 /** Data for one KPI view mode (Mode A or Mode B) */
@@ -90,8 +101,8 @@ export interface RawDetailRow {
   primaryGroup: string;
   secondaryGroup: string;
   metricValue: number;
-  planValue: number | null;
-  prevValue: number | null;
+  comp1Value: number | null;
+  comp2Value: number | null;
 }
 
 /** Raw detail data passed from transformProps to component */
@@ -103,12 +114,12 @@ export interface DetailDataRaw {
 export interface DetailRow {
   name: string;
   value: string;
-  planValue?: string;
-  planDelta?: string;
-  planStatus?: DeltaStatus;
-  prevValue?: string;
-  prevDelta?: string;
-  prevStatus?: DeltaStatus;
+  comp1Value?: string;
+  comp1Delta?: string;
+  comp1Status?: DeltaStatus;
+  comp2Value?: string;
+  comp2Delta?: string;
+  comp2Status?: DeltaStatus;
 }
 
 /** Expandable group with aggregated summary and child rows */
@@ -140,8 +151,6 @@ export interface KpiCardProps {
 
   // ── Mode ──
   modeCount: 'single' | 'dual';
-  modeAName: string;
-  modeBName: string;
   toggleLabelA: string;
   toggleLabelB: string;
 
@@ -149,13 +158,23 @@ export interface KpiCardProps {
   modeAView: KpiViewData;
   modeBView: KpiViewData;
 
-  // ── Color schemes per mode ──
-  colorSchemeA: ComparisonColorScheme;
-  colorSchemeB: ComparisonColorScheme;
+  // ── Color schemes (per comparison type × per mode) ──
+  colorScheme1A: ComparisonColorScheme;
+  colorScheme1B: ComparisonColorScheme;
+  colorScheme2A: ComparisonColorScheme;
+  colorScheme2B: ComparisonColorScheme;
 
-  // ── Comparison visibility ──
-  enablePlan: boolean;
-  enableYoy: boolean;
+  // ── Delta format (per comparison type × per mode) ──
+  deltaFormat1A: DeltaFormat;
+  deltaFormat2A: DeltaFormat;
+  deltaFormat1B: DeltaFormat;
+  deltaFormat2B: DeltaFormat;
+
+  // ── Comparison visibility & labels ──
+  enableComp1: boolean;
+  enableComp2: boolean;
+  comp1Label: string;
+  comp2Label: string;
 
   // ── Hierarchy labels ──
   hierarchyLabelPrimary: string;

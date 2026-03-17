@@ -25,8 +25,6 @@ import {
   SearchBox,
   SearchIcon,
   SearchInput,
-  ModeToggle,
-  ModeButton,
   FlipButton,
   FlipIcon,
   FlipLabel,
@@ -55,20 +53,22 @@ function exportToCsv(
   title: string,
   groupLabel: string,
   childLabel: string,
-  enablePlan: boolean,
-  enableYoy: boolean,
+  enableComp1: boolean,
+  enableComp2: boolean,
+  comp1Header: string,
+  comp2Header: string,
 ): void {
   const BOM = '\uFEFF';
   const headers = [groupLabel, childLabel, 'Факт'];
-  if (enablePlan) headers.push('План', 'Δ План');
-  if (enableYoy) headers.push('ПГ', 'Δ ПГ');
+  if (enableComp1) headers.push(comp1Header, `Δ ${comp1Header}`);
+  if (enableComp2) headers.push(comp2Header, `Δ ${comp2Header}`);
 
   const rows: string[][] = [];
   for (const group of data) {
     for (const child of group.children) {
       const row = [group.name, child.name, child.value];
-      if (enablePlan) row.push(child.planValue ?? '', child.planDelta ?? '');
-      if (enableYoy) row.push(child.prevValue ?? '', child.prevDelta ?? '');
+      if (enableComp1) row.push(child.comp1Value ?? '', child.comp1Delta ?? '');
+      if (enableComp2) row.push(child.comp2Value ?? '', child.comp2Delta ?? '');
       rows.push(row);
     }
   }
@@ -128,14 +128,14 @@ function GroupRowView({
   group,
   expanded,
   onToggle,
-  enablePlan,
-  enableYoy,
+  enableComp1,
+  enableComp2,
 }: {
   group: DetailGroup;
   expanded: boolean;
   onToggle: () => void;
-  enablePlan: boolean;
-  enableYoy: boolean;
+  enableComp1: boolean;
+  enableComp2: boolean;
 }): JSX.Element {
   const { summary } = group;
   return (
@@ -145,13 +145,13 @@ function GroupRowView({
         {group.name}
       </td>
       <td className="r">{summary.value}</td>
-      {enablePlan && <td className="r">{summary.planValue ?? ''}</td>}
-      {enablePlan && (
-        <DeltaCell delta={summary.planDelta} status={summary.planStatus} />
+      {enableComp1 && <td className="r">{summary.comp1Value ?? ''}</td>}
+      {enableComp1 && (
+        <DeltaCell delta={summary.comp1Delta} status={summary.comp1Status} />
       )}
-      {enableYoy && <td className="r">{summary.prevValue ?? ''}</td>}
-      {enableYoy && (
-        <DeltaCell delta={summary.prevDelta} status={summary.prevStatus} />
+      {enableComp2 && <td className="r">{summary.comp2Value ?? ''}</td>}
+      {enableComp2 && (
+        <DeltaCell delta={summary.comp2Delta} status={summary.comp2Status} />
       )}
     </GroupRow>
   );
@@ -159,24 +159,24 @@ function GroupRowView({
 
 function ChildRowView({
   row,
-  enablePlan,
-  enableYoy,
+  enableComp1,
+  enableComp2,
 }: {
   row: DetailRow;
-  enablePlan: boolean;
-  enableYoy: boolean;
+  enableComp1: boolean;
+  enableComp2: boolean;
 }): JSX.Element {
   return (
     <ChildRow>
       <td>{row.name}</td>
       <td className="r">{row.value}</td>
-      {enablePlan && <td className="r">{row.planValue ?? ''}</td>}
-      {enablePlan && (
-        <DeltaCell delta={row.planDelta} status={row.planStatus} />
+      {enableComp1 && <td className="r">{row.comp1Value ?? ''}</td>}
+      {enableComp1 && (
+        <DeltaCell delta={row.comp1Delta} status={row.comp1Status} />
       )}
-      {enableYoy && <td className="r">{row.prevValue ?? ''}</td>}
-      {enableYoy && (
-        <DeltaCell delta={row.prevDelta} status={row.prevStatus} />
+      {enableComp2 && <td className="r">{row.comp2Value ?? ''}</td>}
+      {enableComp2 && (
+        <DeltaCell delta={row.comp2Delta} status={row.comp2Status} />
       )}
     </ChildRow>
   );
@@ -191,13 +191,16 @@ interface DetailModalProps {
   headerValue: string;
   detailDataRaw: DetailDataRaw;
   aggregationType: AggregationType;
-  colorScheme: ComparisonColorScheme;
+  colorScheme1: ComparisonColorScheme;
+  colorScheme2: ComparisonColorScheme;
   formatValue: (n: number) => string;
   formatDelta: (n: number) => string;
   hierarchyLabelPrimary: string;
   hierarchyLabelSecondary: string;
-  enablePlan: boolean;
-  enableYoy: boolean;
+  enableComp1: boolean;
+  enableComp2: boolean;
+  comp1Label: string;
+  comp2Label: string;
   topN: number;
   isDarkMode: boolean;
 }
@@ -211,13 +214,16 @@ export default function DetailModal({
   headerValue,
   detailDataRaw,
   aggregationType,
-  colorScheme,
+  colorScheme1,
+  colorScheme2,
   formatValue,
   formatDelta,
   hierarchyLabelPrimary,
   hierarchyLabelSecondary,
-  enablePlan,
-  enableYoy,
+  enableComp1,
+  enableComp2,
+  comp1Label,
+  comp2Label,
   topN,
 }: DetailModalProps): JSX.Element | null {
   const [isClosing, setIsClosing] = useState(false);
@@ -237,6 +243,10 @@ export default function DetailModal({
   const groupLabel = isPrimary ? hierarchyLabelPrimary : hierarchyLabelSecondary;
   const childLabel = isPrimary ? hierarchyLabelSecondary : hierarchyLabelPrimary;
 
+  // Comparison header labels (strip trailing colon for table/CSV)
+  const comp1Header = comp1Label.replace(/:?\s*$/, '');
+  const comp2Header = comp2Label.replace(/:?\s*$/, '');
+
   /* ── Aggregate raw data on hierarchy/mode change (Req #11) ── */
 
   const aggregatedData = useMemo(
@@ -249,17 +259,18 @@ export default function DetailModal({
         topN,
         formatValue,
         formatDelta,
-        colorScheme,
-        enablePlan,
-        enableYoy,
+        colorScheme1,
+        colorScheme2,
+        enableComp1,
+        enableComp2,
       }),
     [
       detailDataRaw, isPrimary, aggregationType, topN,
-      formatValue, formatDelta, colorScheme, enablePlan, enableYoy,
+      formatValue, formatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2,
     ],
   );
 
-  /* ── Search filtering ── */
+  /* ── Search filtering (searches both groups and children) ── */
 
   const filteredData = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
@@ -267,7 +278,10 @@ export default function DetailModal({
 
     return aggregatedData
       .map(group => {
+        // If group name matches, show it with all children
         if (group.name.toLowerCase().includes(q)) return group;
+
+        // Otherwise, filter children by match
         const matchingChildren = group.children.filter(child =>
           child.name.toLowerCase().includes(q),
         );
@@ -361,12 +375,12 @@ export default function DetailModal({
   /* ── Export ── */
 
   const handleExport = useCallback((): void => {
-    exportToCsv(filteredData, title, groupLabel, childLabel, enablePlan, enableYoy);
-  }, [filteredData, title, groupLabel, childLabel, enablePlan, enableYoy]);
+    exportToCsv(filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header);
+  }, [filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header]);
 
   /* ── Compute column count for table-layout ── */
 
-  const colCount = 2 + (enablePlan ? 2 : 0) + (enableYoy ? 2 : 0);
+  const colCount = 2 + (enableComp1 ? 2 : 0) + (enableComp2 ? 2 : 0);
 
   // Column widths based on visible columns
   const nameWidth = colCount <= 4 ? '40%' : '30%';
@@ -376,14 +390,6 @@ export default function DetailModal({
   /* ── Render guard ── */
 
   if (!isOpen && !isClosing) return null;
-
-  // Abbreviated labels for mode toggle buttons
-  const primaryShort = hierarchyLabelPrimary.length > 4
-    ? hierarchyLabelPrimary.slice(0, 4)
-    : hierarchyLabelPrimary;
-  const secondaryShort = hierarchyLabelSecondary.length > 3
-    ? hierarchyLabelSecondary.slice(0, 3)
-    : hierarchyLabelSecondary;
 
   return (
     <Overlay closing={isClosing} onClick={handleOverlayClick}>
@@ -415,25 +421,11 @@ export default function DetailModal({
             <MagnifyIcon />
             <SearchInput
               type="text"
-              placeholder={`Поиск по ${groupLabel.toLowerCase()}...`}
+              placeholder="Поиск..."
               aria-label="Поиск"
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
-            <ModeToggle>
-              <ModeButton
-                active={isPrimary}
-                onClick={() => setHierarchyMode('primary')}
-              >
-                {primaryShort}
-              </ModeButton>
-              <ModeButton
-                active={!isPrimary}
-                onClick={() => setHierarchyMode('secondary')}
-              >
-                {secondaryShort}
-              </ModeButton>
-            </ModeToggle>
           </SearchBox>
 
           <FlipButton
@@ -448,7 +440,7 @@ export default function DetailModal({
             </FlipLabel>
           </FlipButton>
 
-          <ResultsCount>{groupCount} групп</ResultsCount>
+          <ResultsCount>{groupLabel}: {groupCount}</ResultsCount>
         </ModalToolbar>
 
         {/* ── Table — dynamic columns ── */}
@@ -458,16 +450,16 @@ export default function DetailModal({
               <THRow>
                 <th style={{ width: nameWidth }}>{groupLabel}</th>
                 <th className="r" style={{ width: valWidth }}>Факт</th>
-                {enablePlan && (
-                  <th className="r" style={{ width: valWidth }}>План</th>
+                {enableComp1 && (
+                  <th className="r" style={{ width: valWidth }}>{comp1Header}</th>
                 )}
-                {enablePlan && (
+                {enableComp1 && (
                   <th className="r" style={{ width: deltaWidth }}>Δ</th>
                 )}
-                {enableYoy && (
-                  <th className="r" style={{ width: valWidth }}>ПГ</th>
+                {enableComp2 && (
+                  <th className="r" style={{ width: valWidth }}>{comp2Header}</th>
                 )}
-                {enableYoy && (
+                {enableComp2 && (
                   <th className="r" style={{ width: deltaWidth }}>Δ</th>
                 )}
               </THRow>
@@ -481,16 +473,16 @@ export default function DetailModal({
                       group={group}
                       expanded={isExpanded}
                       onToggle={() => toggleGroup(group.name)}
-                      enablePlan={enablePlan}
-                      enableYoy={enableYoy}
+                      enableComp1={enableComp1}
+                      enableComp2={enableComp2}
                     />
                     {isExpanded &&
                       group.children.map(child => (
                         <ChildRowView
                           key={child.name}
                           row={child}
-                          enablePlan={enablePlan}
-                          enableYoy={enableYoy}
+                          enableComp1={enableComp1}
+                          enableComp2={enableComp2}
                         />
                       ))}
                   </React.Fragment>

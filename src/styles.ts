@@ -276,13 +276,13 @@ export const Subtitle = styled.div`
 
 /* ── Comparisons (horizontal wrap: Plan + YoY side by side) ── */
 
-export const ComparisonSection = styled.div`
+export const ComparisonSection = styled.div<{ skipAnimation?: boolean }>`
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
   padding-top: 10px;
   position: relative;
-  animation-name: kpi-cmp-in;
+  animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-cmp-in'};
   animation-duration: 0.5s;
   animation-timing-function: ${EASE};
   animation-delay: 0.55s;
@@ -297,7 +297,7 @@ export const ComparisonSection = styled.div`
     height: 1px;
     background: var(--g100);
     transform-origin: left;
-    animation-name: kpi-line-in;
+    animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-line-in'};
     animation-duration: 0.4s;
     animation-timing-function: ${EASE};
     animation-delay: 0.5s;
@@ -334,14 +334,14 @@ export const ComparisonValue = styled.span`
 
 /* ── Delta pill ── */
 
-export const DeltaPill = styled.span<{ status: string }>`
+export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }>`
   font-family: var(--m);
   font-size: 10px;
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 4px;
   white-space: nowrap;
-  animation-name: kpi-pill-pop;
+  animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-pill-pop'};
   animation-duration: 0.45s;
   animation-timing-function: ${EASE};
   animation-delay: 0.7s;

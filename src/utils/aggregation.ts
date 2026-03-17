@@ -97,32 +97,33 @@ function computeDelta(
 function formatRow(
   name: string,
   metric: number,
-  plan: number | null,
-  prev: number | null,
+  comp1: number | null,
+  comp2: number | null,
   aggregationType: AggregationType,
   formatValue: (n: number) => string,
   formatDelta: (n: number) => string,
-  colorScheme: ComparisonColorScheme,
-  enablePlan: boolean,
-  enableYoy: boolean,
+  colorScheme1: ComparisonColorScheme,
+  colorScheme2: ComparisonColorScheme,
+  enableComp1: boolean,
+  enableComp2: boolean,
 ): DetailRow {
   const row: DetailRow = {
     name,
     value: formatValue(metric),
   };
 
-  if (enablePlan && plan != null) {
-    const d = computeDelta(metric, plan, aggregationType, formatDelta);
-    row.planValue = formatValue(plan);
-    row.planDelta = d.formatted;
-    row.planStatus = getDeltaStatus(d.status_value, colorScheme);
+  if (enableComp1 && comp1 != null) {
+    const d = computeDelta(metric, comp1, aggregationType, formatDelta);
+    row.comp1Value = formatValue(comp1);
+    row.comp1Delta = d.formatted;
+    row.comp1Status = getDeltaStatus(d.status_value, colorScheme1);
   }
 
-  if (enableYoy && prev != null) {
-    const d = computeDelta(metric, prev, aggregationType, formatDelta);
-    row.prevValue = formatValue(prev);
-    row.prevDelta = d.formatted;
-    row.prevStatus = getDeltaStatus(d.status_value, colorScheme);
+  if (enableComp2 && comp2 != null) {
+    const d = computeDelta(metric, comp2, aggregationType, formatDelta);
+    row.comp2Value = formatValue(comp2);
+    row.comp2Delta = d.formatted;
+    row.comp2Status = getDeltaStatus(d.status_value, colorScheme2);
   }
 
   return row;
@@ -140,9 +141,10 @@ export interface AggregateOptions {
   topN: number;
   formatValue: (n: number) => string;
   formatDelta: (n: number) => string;
-  colorScheme: ComparisonColorScheme;
-  enablePlan: boolean;
-  enableYoy: boolean;
+  colorScheme1: ComparisonColorScheme;
+  colorScheme2: ComparisonColorScheme;
+  enableComp1: boolean;
+  enableComp2: boolean;
 }
 
 /**
@@ -162,13 +164,14 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
     topN,
     formatValue,
     formatDelta,
-    colorScheme,
-    enablePlan,
-    enableYoy,
+    colorScheme1,
+    colorScheme2,
+    enableComp1,
+    enableComp2,
   } = opts;
 
-  // ── PERCENT mode: convert absolute values to shares (0..1) ──
-  // Sum of shares within a group = group's share of total.
+  // ── PERCENT mode: compute metric/comp1 ratio per row ──
+  // Each row becomes its metricValue/comp1Value ratio (0..1+).
   // Delta is in percentage points (п.п.).
   let processedRows: RawDetailRow[] = rows;
   let effectiveAggType: AggregationType = aggregationType;
@@ -176,28 +179,27 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
   let effectiveFormatDelta = formatDelta;
 
   if (aggregationType === 'PERCENT') {
-    const totalMetric = rows.reduce((s, r) => s + r.metricValue, 0);
-    const totalPlan = rows.reduce((s, r) => s + (r.planValue ?? 0), 0);
-    const totalPrev = rows.reduce((s, r) => s + (r.prevValue ?? 0), 0);
-
     processedRows = rows.map(r => ({
       ...r,
-      metricValue: totalMetric !== 0 ? r.metricValue / totalMetric : 0,
-      planValue:
-        r.planValue != null && totalPlan !== 0
-          ? r.planValue / totalPlan
-          : null,
-      prevValue:
-        r.prevValue != null && totalPrev !== 0
-          ? r.prevValue / totalPrev
+      // metric / comp1 ratio (e.g. 1.06 = 106%)
+      metricValue:
+        r.comp1Value != null && r.comp1Value !== 0
+          ? r.metricValue / r.comp1Value
+          : 0,
+      // ПЛАН / ПЛАН = 1 (100% — baseline)
+      comp1Value: r.comp1Value != null ? 1 : null,
+      // ФАКТ / comp2 ratio
+      comp2Value:
+        r.comp2Value != null && r.comp2Value !== 0
+          ? r.metricValue / r.comp2Value
           : null,
     }));
 
-    // Sum shares within a group gives the group's share
-    effectiveAggType = 'SUM';
-    // Format as "22,4%" instead of "892 млн"
+    // Average the ratios within a group (weighted avg not needed — already ratios)
+    effectiveAggType = 'AVERAGE';
+    // Format as "106,2%" instead of "892 млн"
     effectiveFormatValue = (n: number) => formatRussianPercent(n, false);
-    // Delta in percentage points: "+1,3 п.п."
+    // Delta in percentage points: "+6,2 п.п."
     effectiveFormatDelta = (n: number) => formatRussianPP(n);
   }
 
@@ -232,10 +234,10 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
     const children: DetailRow[] = [];
     for (const [childName, childRows] of childMap) {
       const m = aggregateValues(childRows.map(r => r.metricValue), effectiveAggType);
-      const p = aggregateNullable(childRows.map(r => r.planValue), effectiveAggType);
-      const pr = aggregateNullable(childRows.map(r => r.prevValue), effectiveAggType);
+      const p = aggregateNullable(childRows.map(r => r.comp1Value), effectiveAggType);
+      const pr = aggregateNullable(childRows.map(r => r.comp2Value), effectiveAggType);
       children.push(
-        formatRow(childName, m, p, pr, effectiveAggType, effectiveFormatValue, effectiveFormatDelta, colorScheme, enablePlan, enableYoy),
+        formatRow(childName, m, p, pr, effectiveAggType, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2),
       );
     }
 
@@ -257,12 +259,12 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
 
     // Group summary
     const summaryMetric = aggregateValues(groupRows.map(r => r.metricValue), effectiveAggType);
-    const summaryPlan = aggregateNullable(groupRows.map(r => r.planValue), effectiveAggType);
-    const summaryPrev = aggregateNullable(groupRows.map(r => r.prevValue), effectiveAggType);
+    const summaryComp1 = aggregateNullable(groupRows.map(r => r.comp1Value), effectiveAggType);
+    const summaryComp2 = aggregateNullable(groupRows.map(r => r.comp2Value), effectiveAggType);
 
     const summary = formatRow(
-      groupName, summaryMetric, summaryPlan, summaryPrev,
-      effectiveAggType, effectiveFormatValue, effectiveFormatDelta, colorScheme, enablePlan, enableYoy,
+      groupName, summaryMetric, summaryComp1, summaryComp2,
+      effectiveAggType, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2,
     );
 
     result.push({ group: { name: groupName, summary, children }, rawMetric: summaryMetric });

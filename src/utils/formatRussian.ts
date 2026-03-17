@@ -102,6 +102,32 @@ export function formatRussianPP(ratio: number): string {
  *   formatRussianDeltaAbs(1200000000) → "+1,2 млрд"
  *   formatRussianDeltaAbs(-200000000) → "−0,2 млрд"
  */
+/**
+ * Format a delta value: 'auto' → auto-resolved keyword, anything else → suffix.
+ *
+ * @param diff - raw numeric difference (current - reference)
+ * @param ref  - reference value (for percent calculation)
+ * @param fmt  - resolved format keyword ('percent'|'pp'|'absolute') or custom suffix text
+ */
+export function formatDeltaByFormat(
+  diff: number,
+  ref: number,
+  fmt: string,
+): string {
+  switch (fmt) {
+    case 'percent':
+      return ref !== 0 ? formatRussianPercent(diff / ref, true) : '—';
+    case 'pp':
+      return formatRussianPP(diff);
+    case 'absolute':
+      return formatRussianDeltaAbs(diff);
+    default: {
+      // Custom suffix: absolute delta + user text
+      return `${formatRussianDeltaAbs(diff)} ${fmt}`;
+    }
+  }
+}
+
 export function formatRussianDeltaAbs(value: number): string {
   const sign = value > 0 ? '+' : '';
   const formatted = formatRussianSmart(value);

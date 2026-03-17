@@ -5,6 +5,9 @@ import {
   KpiViewData,
   DetailDataRaw,
   RawDetailRow,
+  ComparisonColorScheme,
+  AggregationType,
+  DeltaFormat,
 } from './types';
 import { formatRussianSmart, formatRussianPercent } from './utils/formatRussian';
 
@@ -26,12 +29,20 @@ export default {
     isDarkMode: { control: 'boolean' },
     modeCount: { control: 'select', options: ['single', 'dual'] },
     headerText: { control: 'text' },
-    colorSchemeA: { control: 'select', options: ['green_up', 'green_down'] },
-    colorSchemeB: { control: 'select', options: ['green_up', 'green_down'] },
+    colorScheme1A: { control: 'select', options: ['green_up', 'green_down'] },
+    colorScheme1B: { control: 'select', options: ['green_up', 'green_down'] },
+    colorScheme2A: { control: 'select', options: ['green_up', 'green_down'] },
+    colorScheme2B: { control: 'select', options: ['green_up', 'green_down'] },
+    deltaFormat1A: { control: 'text' },
+    deltaFormat2A: { control: 'text' },
+    deltaFormat1B: { control: 'text' },
+    deltaFormat2B: { control: 'text' },
     aggregationTypeA: { control: 'select', options: ['SUM', 'PERCENT', 'AVERAGE', 'MAX', 'MIN'] },
     aggregationTypeB: { control: 'select', options: ['SUM', 'PERCENT', 'AVERAGE', 'MAX', 'MIN'] },
-    enablePlan: { control: 'boolean' },
-    enableYoy: { control: 'boolean' },
+    enableComp1: { control: 'boolean' },
+    enableComp2: { control: 'boolean' },
+    comp1Label: { control: 'text' },
+    comp2Label: { control: 'text' },
     hierarchyLabelPrimary: { control: 'text' },
     hierarchyLabelSecondary: { control: 'text' },
     detailDataRaw: { control: false },
@@ -74,17 +85,27 @@ const fmtDelta = (n: number) => formatRussianPercent(n, true);
 // ── Shared props that every card story needs ──
 const SHARED_PROPS: Pick<
   KpiCardProps,
-  | 'colorSchemeA' | 'colorSchemeB'
-  | 'enablePlan' | 'enableYoy'
+  | 'colorScheme1A' | 'colorScheme1B' | 'colorScheme2A' | 'colorScheme2B'
+  | 'deltaFormat1A' | 'deltaFormat2A' | 'deltaFormat1B' | 'deltaFormat2B'
+  | 'enableComp1' | 'enableComp2'
+  | 'comp1Label' | 'comp2Label'
   | 'hierarchyLabelPrimary' | 'hierarchyLabelSecondary'
   | 'aggregationTypeA' | 'aggregationTypeB'
   | 'formatValueA' | 'formatValueB' | 'formatDelta'
   | 'detailTopN'
 > = {
-  colorSchemeA: 'green_up',
-  colorSchemeB: 'green_up',
-  enablePlan: true,
-  enableYoy: true,
+  colorScheme1A: 'green_up',
+  colorScheme1B: 'green_up',
+  colorScheme2A: 'green_up',
+  colorScheme2B: 'green_up',
+  deltaFormat1A: 'auto',
+  deltaFormat2A: 'auto',
+  deltaFormat1B: 'auto',
+  deltaFormat2B: 'auto',
+  enableComp1: true,
+  enableComp2: true,
+  comp1Label: 'План:',
+  comp2Label: 'ПГ:',
   hierarchyLabelPrimary: 'Сегмент',
   hierarchyLabelSecondary: 'Магазин',
   aggregationTypeA: 'SUM',
@@ -103,8 +124,8 @@ const REVENUE_A: KpiViewData = {
   value: '12,4 млрд',
   subtitle: '₽ за период',
   comparisons: [
-    { label: 'План:', value: '11,2 млрд', delta: '+1,2 млрд', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '10,8 млрд', delta: '+14,8%', status: 'up', type: 'yoy' },
+    { label: 'План:', value: '11,2 млрд', delta: '+1,2 млрд', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '10,8 млрд', delta: '+14,8%', status: 'up', type: 'comp2' },
   ],
 };
 
@@ -112,8 +133,8 @@ const REVENUE_B: KpiViewData = {
   value: '+14,8%',
   subtitle: 'рост к ПГ',
   comparisons: [
-    { label: 'План:', value: '+10,7%', delta: 'выше плана', status: 'up', type: 'plan' },
-    { label: 'Доля:', value: '42,1%', delta: '+1,3 п.п.', status: 'up', type: 'yoy' },
+    { label: 'План:', value: '+10,7%', delta: 'выше плана', status: 'up', type: 'comp1' },
+    { label: 'Доля:', value: '42,1%', delta: '+1,3 п.п.', status: 'up', type: 'comp2' },
   ],
 };
 
@@ -121,8 +142,8 @@ const EXPENSES_A: KpiViewData = {
   value: '3,2 млрд',
   subtitle: '₽ за период',
   comparisons: [
-    { label: 'План:', value: '3,4 млрд', delta: '−0,2 млрд', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '3,0 млрд', delta: '+6,7%', status: 'dn', type: 'yoy' },
+    { label: 'План:', value: '3,4 млрд', delta: '−0,2 млрд', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '3,0 млрд', delta: '+6,7%', status: 'dn', type: 'comp2' },
   ],
 };
 
@@ -130,8 +151,8 @@ const EXPENSES_B: KpiViewData = {
   value: '25,8%',
   subtitle: 'доля от выручки',
   comparisons: [
-    { label: 'План:', value: '30,4%', delta: '−4,6 п.п.', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '27,8%', delta: '−2,0 п.п.', status: 'up', type: 'yoy' },
+    { label: 'План:', value: '30,4%', delta: '−4,6 п.п.', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '27,8%', delta: '−2,0 п.п.', status: 'up', type: 'comp2' },
   ],
 };
 
@@ -139,8 +160,8 @@ const MARGIN_A: KpiViewData = {
   value: '9,2 млрд',
   subtitle: '₽ валовая прибыль',
   comparisons: [
-    { label: 'План:', value: '8,1 млрд', delta: '+1,1 млрд', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '8,2 млрд', delta: '+12,2%', status: 'up', type: 'yoy' },
+    { label: 'План:', value: '8,1 млрд', delta: '+1,1 млрд', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '8,2 млрд', delta: '+12,2%', status: 'up', type: 'comp2' },
   ],
 };
 
@@ -148,8 +169,8 @@ const MARGIN_B: KpiViewData = {
   value: '74,2%',
   subtitle: 'валовая маржа',
   comparisons: [
-    { label: 'План:', value: '72,0%', delta: '+2,2 п.п.', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '76,3%', delta: '−2,1 п.п.', status: 'wn', type: 'yoy' },
+    { label: 'План:', value: '72,0%', delta: '+2,2 п.п.', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '76,3%', delta: '−2,1 п.п.', status: 'wn', type: 'comp2' },
   ],
 };
 
@@ -157,8 +178,8 @@ const CONVERSION_A: KpiViewData = {
   value: '5,63%',
   subtitle: 'посетитель → покупатель',
   comparisons: [
-    { label: 'План:', value: '5,50%', delta: '+0,13 п.п.', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '4,41%', delta: '+1,22 п.п.', status: 'up', type: 'yoy' },
+    { label: 'План:', value: '5,50%', delta: '+0,13 п.п.', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '4,41%', delta: '+1,22 п.п.', status: 'up', type: 'comp2' },
   ],
 };
 
@@ -166,8 +187,8 @@ const CONVERSION_B: KpiViewData = {
   value: '+27,7%',
   subtitle: 'рост к ПГ',
   comparisons: [
-    { label: 'План:', value: '+2,4%', delta: 'выше плана', status: 'up', type: 'plan' },
-    { label: 'ПГ:', value: '4,41%', delta: '+27,7%', status: 'up', type: 'yoy' },
+    { label: 'План:', value: '+2,4%', delta: 'выше плана', status: 'up', type: 'comp1' },
+    { label: 'ПГ:', value: '4,41%', delta: '+27,7%', status: 'up', type: 'comp2' },
   ],
 };
 
@@ -177,19 +198,19 @@ const CONVERSION_B: KpiViewData = {
 
 const RAW_DETAIL_ROWS: RawDetailRow[] = [
   // Segment: Продукты питания
-  { primaryGroup: 'Продукты питания', secondaryGroup: '№12 Центральный', metricValue: 892_000_000, planValue: 840_000_000, prevValue: 780_000_000 },
-  { primaryGroup: 'Продукты питания', secondaryGroup: '№5 Северный', metricValue: 756_000_000, planValue: 710_000_000, prevValue: 690_000_000 },
-  { primaryGroup: 'Продукты питания', secondaryGroup: '№31 Южный', metricValue: 644_000_000, planValue: 680_000_000, prevValue: 610_000_000 },
+  { primaryGroup: 'Продукты питания', secondaryGroup: '№12 Центральный', metricValue: 892_000_000, comp1Value: 840_000_000, comp2Value: 780_000_000 },
+  { primaryGroup: 'Продукты питания', secondaryGroup: '№5 Северный', metricValue: 756_000_000, comp1Value: 710_000_000, comp2Value: 690_000_000 },
+  { primaryGroup: 'Продукты питания', secondaryGroup: '№31 Южный', metricValue: 644_000_000, comp1Value: 680_000_000, comp2Value: 610_000_000 },
   // Segment: Бытовая химия
-  { primaryGroup: 'Бытовая химия', secondaryGroup: '№12 Центральный', metricValue: 412_000_000, planValue: 390_000_000, prevValue: 370_000_000 },
-  { primaryGroup: 'Бытовая химия', secondaryGroup: '№8 Восточный', metricValue: 358_000_000, planValue: 370_000_000, prevValue: 340_000_000 },
+  { primaryGroup: 'Бытовая химия', secondaryGroup: '№12 Центральный', metricValue: 412_000_000, comp1Value: 390_000_000, comp2Value: 370_000_000 },
+  { primaryGroup: 'Бытовая химия', secondaryGroup: '№8 Восточный', metricValue: 358_000_000, comp1Value: 370_000_000, comp2Value: 340_000_000 },
   // Segment: Алкоголь
-  { primaryGroup: 'Алкоголь', secondaryGroup: '№5 Северный', metricValue: 298_000_000, planValue: 310_000_000, prevValue: 280_000_000 },
-  { primaryGroup: 'Алкоголь', secondaryGroup: '№22 Западный', metricValue: 245_000_000, planValue: 280_000_000, prevValue: 260_000_000 },
+  { primaryGroup: 'Алкоголь', secondaryGroup: '№5 Северный', metricValue: 298_000_000, comp1Value: 310_000_000, comp2Value: 280_000_000 },
+  { primaryGroup: 'Алкоголь', secondaryGroup: '№22 Западный', metricValue: 245_000_000, comp1Value: 280_000_000, comp2Value: 260_000_000 },
   // Segment: Кондитерские изделия
-  { primaryGroup: 'Кондитерские изделия', secondaryGroup: '№12 Центральный', metricValue: 342_000_000, planValue: 300_000_000, prevValue: 290_000_000 },
+  { primaryGroup: 'Кондитерские изделия', secondaryGroup: '№12 Центральный', metricValue: 342_000_000, comp1Value: 300_000_000, comp2Value: 290_000_000 },
   // Segment: Товары для дома
-  { primaryGroup: 'Товары для дома', secondaryGroup: '№31 Южный', metricValue: 210_000_000, planValue: 200_000_000, prevValue: 195_000_000 },
+  { primaryGroup: 'Товары для дома', secondaryGroup: '№31 Южный', metricValue: 210_000_000, comp1Value: 200_000_000, comp2Value: 195_000_000 },
 ];
 
 const MOCK_DETAIL_RAW: DetailDataRaw = { rows: RAW_DETAIL_ROWS };
@@ -205,8 +226,6 @@ export const Revenue = {
     height: CARD_HEIGHT,
     headerText: 'Выручка',
     modeCount: 'dual' as const,
-    modeAName: 'Рубли',
-    modeBName: 'Проценты',
     toggleLabelA: '₽',
     toggleLabelB: '%',
     modeAView: REVENUE_A,
@@ -256,30 +275,99 @@ const GRID_CSS = `
 }
 `;
 
-function KpiGrid({ isDarkMode, withDetail }: { isDarkMode: boolean; withDetail?: boolean }) {
+/** Props forwarded from Storybook args to KpiGrid */
+interface KpiGridOverrides {
+  isDarkMode: boolean;
+  withDetail?: boolean;
+  colorScheme1A: ComparisonColorScheme;
+  colorScheme1B: ComparisonColorScheme;
+  colorScheme2A: ComparisonColorScheme;
+  colorScheme2B: ComparisonColorScheme;
+  deltaFormat1A: DeltaFormat;
+  deltaFormat2A: DeltaFormat;
+  deltaFormat1B: DeltaFormat;
+  deltaFormat2B: DeltaFormat;
+  enableComp1: boolean;
+  enableComp2: boolean;
+  comp1Label: string;
+  comp2Label: string;
+  aggregationTypeA: AggregationType;
+  aggregationTypeB: AggregationType;
+  hierarchyLabelPrimary: string;
+  hierarchyLabelSecondary: string;
+}
+
+function KpiGrid({
+  isDarkMode,
+  withDetail,
+  colorScheme1A,
+  colorScheme1B,
+  colorScheme2A,
+  colorScheme2B,
+  deltaFormat1A,
+  deltaFormat2A,
+  deltaFormat1B,
+  deltaFormat2B,
+  enableComp1,
+  enableComp2,
+  comp1Label,
+  comp2Label,
+  aggregationTypeA,
+  aggregationTypeB,
+  hierarchyLabelPrimary,
+  hierarchyLabelSecondary,
+}: KpiGridOverrides) {
   const bg = isDarkMode ? '#0F1114' : '#F3F3F3';
   const detail = withDetail ? { detailDataRaw: MOCK_DETAIL_RAW } : {};
 
+  // "Расходы" inverts color scheme: growth in expenses is bad
+  const inv = (s: ComparisonColorScheme): ComparisonColorScheme =>
+    s === 'green_up' ? 'green_down' : 'green_up';
+
+  // Merge SHARED_PROPS with Storybook-controlled overrides
+  const shared = {
+    ...SHARED_PROPS,
+    colorScheme1A,
+    colorScheme1B,
+    colorScheme2A,
+    colorScheme2B,
+    deltaFormat1A,
+    deltaFormat2A,
+    deltaFormat1B,
+    deltaFormat2B,
+    enableComp1,
+    enableComp2,
+    comp1Label,
+    comp2Label,
+    aggregationTypeA,
+    aggregationTypeB,
+    hierarchyLabelPrimary,
+    hierarchyLabelSecondary,
+  };
+
   const cards: Array<Omit<KpiCardProps, 'width' | 'height' | 'theme'>> = [
     {
-      headerText: 'Выручка', modeCount: 'dual', modeAName: 'Рубли', modeBName: 'Проценты',
+      headerText: 'Выручка', modeCount: 'dual',
       toggleLabelA: '₽', toggleLabelB: '%', modeAView: REVENUE_A, modeBView: REVENUE_B,
-      isDarkMode, ...SHARED_PROPS, ...detail,
+      isDarkMode, ...shared, ...detail,
     },
     {
-      headerText: 'Расходы', modeCount: 'dual', modeAName: 'Рубли', modeBName: 'Проценты',
+      headerText: 'Расходы', modeCount: 'dual',
       toggleLabelA: '₽', toggleLabelB: '%', modeAView: EXPENSES_A, modeBView: EXPENSES_B,
-      isDarkMode, ...SHARED_PROPS, colorSchemeA: 'green_down', colorSchemeB: 'green_down', ...detail,
+      isDarkMode, ...shared,
+      colorScheme1A: inv(colorScheme1A), colorScheme1B: inv(colorScheme1B),
+      colorScheme2A: inv(colorScheme2A), colorScheme2B: inv(colorScheme2B),
+      ...detail,
     },
     {
-      headerText: 'Маржа', modeCount: 'dual', modeAName: 'Рубли', modeBName: 'Проценты',
+      headerText: 'Маржа', modeCount: 'dual',
       toggleLabelA: '₽', toggleLabelB: '%', modeAView: MARGIN_A, modeBView: MARGIN_B,
-      isDarkMode, ...SHARED_PROPS, ...detail,
+      isDarkMode, ...shared, ...detail,
     },
     {
-      headerText: 'Конверсия', modeCount: 'dual', modeAName: 'абс', modeBName: 'Проценты',
+      headerText: 'Конверсия', modeCount: 'dual',
       toggleLabelA: 'абс', toggleLabelB: '%', modeAView: CONVERSION_A, modeBView: CONVERSION_B,
-      isDarkMode, ...SHARED_PROPS, ...detail,
+      isDarkMode, ...shared, ...detail,
     },
   ];
 
@@ -296,33 +384,63 @@ function KpiGrid({ isDarkMode, withDetail }: { isDarkMode: boolean; withDetail?:
   );
 }
 
+/** Default args shared by all Grid stories */
+const GRID_ARGS: KpiGridOverrides = {
+  isDarkMode: false,
+  colorScheme1A: 'green_up',
+  colorScheme1B: 'green_up',
+  colorScheme2A: 'green_up',
+  colorScheme2B: 'green_up',
+  deltaFormat1A: 'auto',
+  deltaFormat2A: 'auto',
+  deltaFormat1B: 'auto',
+  deltaFormat2B: 'auto',
+  enableComp1: true,
+  enableComp2: true,
+  comp1Label: 'План:',
+  comp2Label: 'ПГ:',
+  aggregationTypeA: 'SUM',
+  aggregationTypeB: 'PERCENT',
+  hierarchyLabelPrimary: 'Сегмент',
+  hierarchyLabelSecondary: 'Магазин',
+};
+
 export const GridLight = {
-  render: () => <KpiGrid isDarkMode={false} />,
+  args: { ...GRID_ARGS },
+  render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
   parameters: { backgrounds: { default: 'light' }, layout: 'fullscreen' },
 };
 
 export const GridDark = {
-  render: () => <KpiGrid isDarkMode />,
+  args: { ...GRID_ARGS, isDarkMode: true },
+  render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
   parameters: { backgrounds: { default: 'dark' }, layout: 'fullscreen' },
 };
 
 /** Grid with detail — click any card to open drill-down modal */
 export const GridWithDetailLight = {
-  render: () => <KpiGrid isDarkMode={false} withDetail />,
+  args: { ...GRID_ARGS, withDetail: true },
+  render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
   parameters: { backgrounds: { default: 'light' }, layout: 'fullscreen' },
 };
 
 /** Grid with detail — dark theme */
 export const GridWithDetailDark = {
-  render: () => <KpiGrid isDarkMode withDetail />,
+  args: { ...GRID_ARGS, isDarkMode: true, withDetail: true },
+  render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
   parameters: { backgrounds: { default: 'dark' }, layout: 'fullscreen' },
 };
 
 /** Revenue card with detail drill-down — click to open modal */
 export const RevenueWithDetail = {
-  args: {
+  args:{
     ...Revenue.args,
-    detailDataRaw: MOCK_DETAIL_RAW,
+    detailDataRaw:MOCK_DETAIL_RAW,
+    width:380,
+    deltaFormat1A:"попав",
+    deltaFormat2A:"absolute",
+    deltaFormat1B:"percent",
+    deltaFormat2B:"percent"
   },
 };
 

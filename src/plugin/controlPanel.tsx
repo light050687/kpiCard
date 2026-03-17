@@ -34,17 +34,24 @@ const COLOR_SCHEME_CHOICES: [string, string][] = [
   ['green_down', t('Decrease is Good (expenses)')],
 ];
 
+const DELTA_FORMAT_CHOICES: [string, string][] = [
+  ['auto', t('Auto (based on aggregation)')],
+  ['percent', t('Percentage (%)')],
+  ['pp', t('Percentage Points (п.п.)')],
+  ['absolute', t('Absolute Value (₽, units)')],
+];
+
 // ── Visibility helpers ──
 type ControlsMap = { controls: Record<string, { value?: unknown }> };
 
 const isDual = ({ controls }: ControlsMap): boolean =>
   controls?.mode_count?.value === 'dual';
 
-const isPlanEnabled = ({ controls }: ControlsMap): boolean =>
-  controls?.enable_plan?.value === true;
+const isComp1Enabled = ({ controls }: ControlsMap): boolean =>
+  controls?.enable_comp1?.value === true;
 
-const isYoyEnabled = ({ controls }: ControlsMap): boolean =>
-  controls?.enable_yoy?.value === true;
+const isComp2Enabled = ({ controls }: ControlsMap): boolean =>
+  controls?.enable_comp2?.value === true;
 
 // ═══════════════════════════════════════
 // Control Panel Configuration
@@ -156,18 +163,6 @@ const config: ControlPanelConfig = {
       controlSetRows: [
         [
           {
-            name: 'mode_a_name',
-            config: {
-              type: 'TextControl',
-              label: t('Mode A Name'),
-              description: t('Internal name for this mode'),
-              default: 'Рубли',
-              renderTrigger: true,
-            },
-          },
-        ],
-        [
-          {
             name: 'toggle_label_a',
             config: {
               type: 'TextControl',
@@ -223,11 +218,52 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'color_scheme_a',
+            name: 'delta_format_1a',
             config: {
               type: 'SelectControl',
-              label: t('Color Logic'),
-              description: t('Determines delta pill colors for this mode'),
+              label: t('Delta Format — Comparison 1'),
+              description: t('How delta is displayed for comparison 1 (%, п.п., absolute, or custom text)'),
+              default: 'auto',
+              choices: DELTA_FORMAT_CHOICES,
+              freeForm: true,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'delta_format_2a',
+            config: {
+              type: 'SelectControl',
+              label: t('Delta Format — Comparison 2'),
+              description: t('How delta is displayed for comparison 2 (%, п.п., absolute, or custom text)'),
+              default: 'auto',
+              choices: DELTA_FORMAT_CHOICES,
+              freeForm: true,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'color_scheme_1a',
+            config: {
+              type: 'SelectControl',
+              label: t('Color Logic — Comparison 1'),
+              description: t('Delta pill colors for comparison 1 in this mode'),
+              default: 'green_up',
+              choices: COLOR_SCHEME_CHOICES,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'color_scheme_2a',
+            config: {
+              type: 'SelectControl',
+              label: t('Color Logic — Comparison 2'),
+              description: t('Delta pill colors for comparison 2 in this mode'),
               default: 'green_up',
               choices: COLOR_SCHEME_CHOICES,
               renderTrigger: true,
@@ -242,18 +278,6 @@ const config: ControlPanelConfig = {
       label: t('Mode B'),
       expanded: true,
       controlSetRows: [
-        [
-          {
-            name: 'mode_b_name',
-            config: {
-              type: 'TextControl',
-              label: t('Mode B Name'),
-              default: 'Проценты',
-              renderTrigger: true,
-              visibility: isDual,
-            },
-          },
-        ],
         [
           {
             name: 'toggle_label_b',
@@ -307,10 +331,55 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'color_scheme_b',
+            name: 'delta_format_1b',
             config: {
               type: 'SelectControl',
-              label: t('Color Logic'),
+              label: t('Delta Format — Comparison 1'),
+              description: t('How delta is displayed for comparison 1 (%, п.п., absolute, or custom text)'),
+              default: 'auto',
+              choices: DELTA_FORMAT_CHOICES,
+              freeForm: true,
+              renderTrigger: true,
+              visibility: isDual,
+            },
+          },
+        ],
+        [
+          {
+            name: 'delta_format_2b',
+            config: {
+              type: 'SelectControl',
+              label: t('Delta Format — Comparison 2'),
+              description: t('How delta is displayed for comparison 2 (%, п.п., absolute, or custom text)'),
+              default: 'auto',
+              choices: DELTA_FORMAT_CHOICES,
+              freeForm: true,
+              renderTrigger: true,
+              visibility: isDual,
+            },
+          },
+        ],
+        [
+          {
+            name: 'color_scheme_1b',
+            config: {
+              type: 'SelectControl',
+              label: t('Color Logic — Comparison 1'),
+              description: t('Delta pill colors for comparison 1 in this mode'),
+              default: 'green_up',
+              choices: COLOR_SCHEME_CHOICES,
+              renderTrigger: true,
+              visibility: isDual,
+            },
+          },
+        ],
+        [
+          {
+            name: 'color_scheme_2b',
+            config: {
+              type: 'SelectControl',
+              label: t('Color Logic — Comparison 2'),
+              description: t('Delta pill colors for comparison 2 in this mode'),
               default: 'green_up',
               choices: COLOR_SCHEME_CHOICES,
               renderTrigger: true,
@@ -328,11 +397,11 @@ const config: ControlPanelConfig = {
       controlSetRows: [
         [
           {
-            name: 'enable_plan',
+            name: 'enable_comp1',
             config: {
               type: 'CheckboxControl',
-              label: t('Show Plan Comparison'),
-              description: t('Display plan/target comparison row'),
+              label: t('Show Comparison 1'),
+              description: t('Display first comparison row (e.g., plan/target)'),
               default: true,
               renderTrigger: true,
             },
@@ -340,24 +409,24 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'plan_label',
+            name: 'comp1_label',
             config: {
               type: 'TextControl',
-              label: t('Plan Label'),
-              description: t('Label text (e.g., "План:", "Target:")'),
+              label: t('Comparison 1 Label'),
+              description: t('Label text (e.g., "План:", "Target:", "Budget:")'),
               default: 'План:',
               renderTrigger: true,
-              visibility: isPlanEnabled,
+              visibility: isComp1Enabled,
             },
           },
         ],
         [
           {
-            name: 'enable_yoy',
+            name: 'enable_comp2',
             config: {
               type: 'CheckboxControl',
-              label: t('Show Period Comparison'),
-              description: t('Display previous period comparison row'),
+              label: t('Show Comparison 2'),
+              description: t('Display second comparison row (e.g., previous period)'),
               default: true,
               renderTrigger: true,
             },
@@ -365,14 +434,14 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'yoy_label',
+            name: 'comp2_label',
             config: {
               type: 'TextControl',
-              label: t('Period Label'),
+              label: t('Comparison 2 Label'),
               description: t('Label text (e.g., "ПГ:", "YoY:", "vs LM:")'),
               default: 'ПГ:',
               renderTrigger: true,
-              visibility: isYoyEnabled,
+              visibility: isComp2Enabled,
             },
           },
         ],
