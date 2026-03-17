@@ -121,7 +121,9 @@ function formatDeltaByType(
     fmt === 'auto'
       ? aggType === 'PERCENT'
         ? 'pp'
-        : 'percent'
+        : aggType === 'SUM'
+          ? 'absolute'
+          : 'percent'
       : fmt;
   return formatDeltaByFormat(diff, ref, effective);
 }
@@ -155,6 +157,8 @@ function buildModeView(params: ModeViewParams): KpiViewData {
       delta: formatDeltaByType(delta, comp1Value, deltaFormat1, aggregationType),
       status,
       type: 'comp1',
+      rawDiff: delta,
+      rawRef: comp1Value,
     });
   }
 
@@ -168,6 +172,8 @@ function buildModeView(params: ModeViewParams): KpiViewData {
       delta: formatDeltaByType(delta, comp2Value, deltaFormat2, aggregationType),
       status,
       type: 'comp2',
+      rawDiff: delta,
+      rawRef: comp2Value,
     });
   }
 

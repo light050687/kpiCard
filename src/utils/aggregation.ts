@@ -12,12 +12,13 @@
 import type {
   AggregationType,
   ComparisonColorScheme,
+  DeltaFormat,
   DeltaStatus,
   DetailGroup,
   DetailRow,
   RawDetailRow,
 } from '../types';
-import { formatRussianPercent, formatRussianPP } from './formatRussian';
+import { formatRussianPercent, formatRussianPP, formatDeltaByFormat } from './formatRussian';
 
 // ═══════════════════════════════════════
 // Core aggregation functions
@@ -73,21 +74,29 @@ function getDeltaStatus(
 function computeDelta(
   current: number,
   reference: number,
-  aggregationType: AggregationType,
-  formatDelta: (n: number) => string,
+  isPercentMode: boolean,
+  deltaFormat: string,
+  defaultFormatDelta: (n: number) => string,
 ): { formatted: string; status_value: number } {
-  if (aggregationType === 'PERCENT') {
-    // Percentage points: current% - reference%
-    const ppDelta = current - reference;
-    return { formatted: formatDelta(ppDelta), status_value: ppDelta };
+  const diff = current - reference;
+
+  if (deltaFormat !== 'auto') {
+    // Custom format — use formatDeltaByFormat directly
+    return {
+      formatted: formatDeltaByFormat(diff, reference, deltaFormat, isPercentMode),
+      status_value: diff,
+    };
   }
 
-  // Relative percentage change
+  // 'auto' mode — use existing behavior via defaultFormatDelta
+  if (isPercentMode) {
+    return { formatted: defaultFormatDelta(diff), status_value: diff };
+  }
   if (reference === 0) {
     return { formatted: '—', status_value: 0 };
   }
-  const pctDelta = (current - reference) / reference;
-  return { formatted: formatDelta(pctDelta), status_value: current - reference };
+  const pctDelta = diff / reference;
+  return { formatted: defaultFormatDelta(pctDelta), status_value: diff };
 }
 
 // ═══════════════════════════════════════
@@ -99,13 +108,15 @@ function formatRow(
   metric: number,
   comp1: number | null,
   comp2: number | null,
-  aggregationType: AggregationType,
+  isPercentMode: boolean,
   formatValue: (n: number) => string,
-  formatDelta: (n: number) => string,
+  defaultFormatDelta: (n: number) => string,
   colorScheme1: ComparisonColorScheme,
   colorScheme2: ComparisonColorScheme,
   enableComp1: boolean,
   enableComp2: boolean,
+  deltaFormat1: string,
+  deltaFormat2: string,
 ): DetailRow {
   const row: DetailRow = {
     name,
@@ -113,14 +124,14 @@ function formatRow(
   };
 
   if (enableComp1 && comp1 != null) {
-    const d = computeDelta(metric, comp1, aggregationType, formatDelta);
+    const d = computeDelta(metric, comp1, isPercentMode, deltaFormat1, defaultFormatDelta);
     row.comp1Value = formatValue(comp1);
     row.comp1Delta = d.formatted;
     row.comp1Status = getDeltaStatus(d.status_value, colorScheme1);
   }
 
   if (enableComp2 && comp2 != null) {
-    const d = computeDelta(metric, comp2, aggregationType, formatDelta);
+    const d = computeDelta(metric, comp2, isPercentMode, deltaFormat2, defaultFormatDelta);
     row.comp2Value = formatValue(comp2);
     row.comp2Delta = d.formatted;
     row.comp2Status = getDeltaStatus(d.status_value, colorScheme2);
@@ -145,6 +156,8 @@ export interface AggregateOptions {
   colorScheme2: ComparisonColorScheme;
   enableComp1: boolean;
   enableComp2: boolean;
+  deltaFormat1: DeltaFormat;
+  deltaFormat2: DeltaFormat;
 }
 
 /**
@@ -168,7 +181,11 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
     colorScheme2,
     enableComp1,
     enableComp2,
+    deltaFormat1,
+    deltaFormat2,
   } = opts;
+
+  const isPercentMode = aggregationType === 'PERCENT';
 
   // ── PERCENT mode: compute metric/comp1 ratio per row ──
   // Each row becomes its metricValue/comp1Value ratio (0..1+).
@@ -178,7 +195,7 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
   let effectiveFormatValue = formatValue;
   let effectiveFormatDelta = formatDelta;
 
-  if (aggregationType === 'PERCENT') {
+  if (isPercentMode) {
     processedRows = rows.map(r => ({
       ...r,
       // metric / comp1 ratio (e.g. 1.06 = 106%)
@@ -237,7 +254,7 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
       const p = aggregateNullable(childRows.map(r => r.comp1Value), effectiveAggType);
       const pr = aggregateNullable(childRows.map(r => r.comp2Value), effectiveAggType);
       children.push(
-        formatRow(childName, m, p, pr, effectiveAggType, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2),
+        formatRow(childName, m, p, pr, isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2),
       );
     }
 
@@ -264,7 +281,7 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
 
     const summary = formatRow(
       groupName, summaryMetric, summaryComp1, summaryComp2,
-      effectiveAggType, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2,
+      isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2,
     );
 
     result.push({ group: { name: groupName, summary, children }, rawMetric: summaryMetric });

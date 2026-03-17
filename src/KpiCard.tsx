@@ -215,23 +215,15 @@ export default function KpiCard({
 
   const rawRows = detailDataRaw?.rows;
 
-  // Format delta: 'auto' resolves by aggregationType, anything else is literal suffix
-  const fmtDeltaByType = (
-    diff: number,
-    ref: number,
-    fmt: DeltaFormat,
-    aggType: AggregationType,
-  ): string => {
-    const effective =
-      fmt === 'auto'
-        ? aggType === 'PERCENT'
-          ? 'pp'
-          : aggType === 'SUM'
-            ? 'absolute'
-            : 'percent'
-        : fmt;
-    return formatDeltaByFormat(diff, ref, effective);
-  };
+  // Resolve 'auto' delta format by aggregationType
+  const resolveAutoFmt = (fmt: DeltaFormat, aggType: AggregationType): string =>
+    fmt === 'auto'
+      ? aggType === 'PERCENT'
+        ? 'pp'
+        : aggType === 'SUM'
+          ? 'absolute'
+          : 'percent'
+      : fmt;
 
   // Recompute hero + comparisons from raw data when aggregation != SUM
   const recomputeFromRaw = (
@@ -310,9 +302,11 @@ export default function KpiCard({
       comparisons.push({
         label: comp1Label,
         value: isPercent ? formatRussianPercent(comp1Num, false) : fmtValue(comp1Num),
-        delta: fmtDeltaByType(heroNum - comp1Num, comp1Num, deltaFmt1, aggType),
+        delta: formatDeltaByFormat(d, comp1Num, resolveAutoFmt(deltaFmt1, aggType)),
         status,
         type: 'comp1',
+        rawDiff: d,
+        rawRef: comp1Num,
       });
     }
 
@@ -322,20 +316,25 @@ export default function KpiCard({
       comparisons.push({
         label: comp2Label,
         value: isPercent ? formatRussianPercent(comp2Num, false) : fmtValue(comp2Num),
-        delta: fmtDeltaByType(heroNum - comp2Num, comp2Num, deltaFmt2, aggType),
+        delta: formatDeltaByFormat(d, comp2Num, resolveAutoFmt(deltaFmt2, aggType)),
         status,
         type: 'comp2',
+        rawDiff: d,
+        rawRef: comp2Num,
       });
     }
 
     return { value: heroStr, subtitle: baseView.subtitle, comparisons };
   };
 
-  // Filter comparisons, override labels, apply per-comparison colorScheme inversion
+  // Filter comparisons, override labels, re-format deltas, apply colorScheme inversion
   const processView = (
     view: KpiViewData,
     scheme1: ComparisonColorScheme,
     scheme2: ComparisonColorScheme,
+    dFmt1: DeltaFormat,
+    dFmt2: DeltaFormat,
+    aggType: AggregationType,
   ): KpiViewData => ({
     ...view,
     comparisons: view.comparisons
@@ -346,26 +345,36 @@ export default function KpiCard({
       })
       .map(cmp => {
         // Override labels with user-configured values
-        let { label } = cmp;
+        let { label, delta } = cmp;
         if (cmp.type === 'comp1') label = comp1Label;
         if (cmp.type === 'comp2') label = comp2Label;
+
+        // Re-format delta from raw values when available
+        if (cmp.rawDiff != null && cmp.rawRef != null) {
+          const fmt = cmp.type === 'comp2' ? dFmt2 : dFmt1;
+          delta = formatDeltaByFormat(
+            cmp.rawDiff, cmp.rawRef, resolveAutoFmt(fmt, aggType),
+            aggType === 'PERCENT',
+          );
+        }
+
         // Apply per-comparison colorScheme
         const scheme = cmp.type === 'comp2' ? scheme2 : scheme1;
-        if (scheme === 'green_up') return { ...cmp, label };
+        if (scheme === 'green_up') return { ...cmp, label, delta };
         // green_down: growth is bad → invert up ↔ dn
         const inverted: DeltaStatus =
           cmp.status === 'up' ? 'dn' : cmp.status === 'dn' ? 'up' : cmp.status;
-        return { ...cmp, label, status: inverted };
+        return { ...cmp, label, delta, status: inverted };
       }),
   });
 
   const viewA = processView(
     recomputeFromRaw(aggregationTypeA, formatValueA, modeAView, deltaFormat1A, deltaFormat2A) ?? modeAView,
-    colorScheme1A, colorScheme2A,
+    colorScheme1A, colorScheme2A, deltaFormat1A, deltaFormat2A, aggregationTypeA,
   );
   const viewB = processView(
     recomputeFromRaw(aggregationTypeB, formatValueB, modeBView, deltaFormat1B, deltaFormat2B) ?? modeBView,
-    colorScheme1B, colorScheme2B,
+    colorScheme1B, colorScheme2B, deltaFormat1B, deltaFormat2B, aggregationTypeB,
   );
 
   const hasDetail = Boolean(rawRows?.length);
@@ -433,6 +442,8 @@ export default function KpiCard({
           aggregationType={isA ? aggregationTypeA : aggregationTypeB}
           colorScheme1={isA ? colorScheme1A : colorScheme1B}
           colorScheme2={isA ? colorScheme2A : colorScheme2B}
+          deltaFormat1={isA ? deltaFormat1A : deltaFormat1B}
+          deltaFormat2={isA ? deltaFormat2A : deltaFormat2B}
           formatValue={isA ? formatValueA : formatValueB}
           formatDelta={formatDelta}
           hierarchyLabelPrimary={hierarchyLabelPrimary}

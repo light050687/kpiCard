@@ -108,21 +108,30 @@ export function formatRussianPP(ratio: number): string {
  * @param diff - raw numeric difference (current - reference)
  * @param ref  - reference value (for percent calculation)
  * @param fmt  - resolved format keyword ('percent'|'pp'|'absolute') or custom suffix text
+ * @param isRatioSpace - true when diff/ref are already in ratio space (PERCENT aggregation)
  */
 export function formatDeltaByFormat(
   diff: number,
   ref: number,
   fmt: string,
+  isRatioSpace = false,
 ): string {
   switch (fmt) {
     case 'percent':
+      if (isRatioSpace) return formatRussianPercent(diff, true);
       return ref !== 0 ? formatRussianPercent(diff / ref, true) : '—';
     case 'pp':
       return formatRussianPP(diff);
     case 'absolute':
+      if (isRatioSpace) return formatRussianPP(diff);
       return formatRussianDeltaAbs(diff);
     default: {
-      // Custom suffix: absolute delta + user text
+      if (isRatioSpace) {
+        // Ratio space: use pp-like number + user suffix
+        const ppStr = formatRussianPP(diff);
+        const base = ppStr.replace(/\s*п\.п\.\s*$/, '');
+        return `${base} ${fmt}`;
+      }
       return `${formatRussianDeltaAbs(diff)} ${fmt}`;
     }
   }

@@ -83,6 +83,10 @@ export interface ComparisonItem {
   status: DeltaStatus;
   /** Identifies comparison kind — used for enable/disable filtering */
   type?: 'comp1' | 'comp2';
+  /** Raw numeric diff (current - reference) — for re-formatting at render time */
+  rawDiff?: number;
+  /** Raw reference value — for re-formatting at render time */
+  rawRef?: number;
 }
 
 /** Data for one KPI view mode (Mode A or Mode B) */

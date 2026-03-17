@@ -7,6 +7,7 @@ import React, {
 } from 'react';
 import {
   DetailDataRaw,
+  DeltaFormat,
   DetailGroup,
   DetailRow,
   HierarchyMode,
@@ -193,6 +194,8 @@ interface DetailModalProps {
   aggregationType: AggregationType;
   colorScheme1: ComparisonColorScheme;
   colorScheme2: ComparisonColorScheme;
+  deltaFormat1: DeltaFormat;
+  deltaFormat2: DeltaFormat;
   formatValue: (n: number) => string;
   formatDelta: (n: number) => string;
   hierarchyLabelPrimary: string;
@@ -216,6 +219,8 @@ export default function DetailModal({
   aggregationType,
   colorScheme1,
   colorScheme2,
+  deltaFormat1,
+  deltaFormat2,
   formatValue,
   formatDelta,
   hierarchyLabelPrimary,
@@ -263,10 +268,13 @@ export default function DetailModal({
         colorScheme2,
         enableComp1,
         enableComp2,
+        deltaFormat1,
+        deltaFormat2,
       }),
     [
       detailDataRaw, isPrimary, aggregationType, topN,
-      formatValue, formatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2,
+      formatValue, formatDelta, colorScheme1, colorScheme2,
+      enableComp1, enableComp2, deltaFormat1, deltaFormat2,
     ],
   );
 

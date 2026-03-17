@@ -124,8 +124,8 @@ const REVENUE_A: KpiViewData = {
   value: '12,4 млрд',
   subtitle: '₽ за период',
   comparisons: [
-    { label: 'План:', value: '11,2 млрд', delta: '+1,2 млрд', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '10,8 млрд', delta: '+14,8%', status: 'up', type: 'comp2' },
+    { label: 'План:', value: '11,2 млрд', delta: '+1,2 млрд', status: 'up', type: 'comp1', rawDiff: 1_200_000_000, rawRef: 11_200_000_000 },
+    { label: 'ПГ:', value: '10,8 млрд', delta: '+14,8%', status: 'up', type: 'comp2', rawDiff: 1_600_000_000, rawRef: 10_800_000_000 },
   ],
 };
 
@@ -134,7 +134,7 @@ const REVENUE_B: KpiViewData = {
   subtitle: 'рост к ПГ',
   comparisons: [
     { label: 'План:', value: '+10,7%', delta: 'выше плана', status: 'up', type: 'comp1' },
-    { label: 'Доля:', value: '42,1%', delta: '+1,3 п.п.', status: 'up', type: 'comp2' },
+    { label: 'Доля:', value: '42,1%', delta: '+1,3 п.п.', status: 'up', type: 'comp2', rawDiff: 0.013, rawRef: 0.408 },
   ],
 };
 
@@ -142,8 +142,8 @@ const EXPENSES_A: KpiViewData = {
   value: '3,2 млрд',
   subtitle: '₽ за период',
   comparisons: [
-    { label: 'План:', value: '3,4 млрд', delta: '−0,2 млрд', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '3,0 млрд', delta: '+6,7%', status: 'dn', type: 'comp2' },
+    { label: 'План:', value: '3,4 млрд', delta: '−0,2 млрд', status: 'up', type: 'comp1', rawDiff: -200_000_000, rawRef: 3_400_000_000 },
+    { label: 'ПГ:', value: '3,0 млрд', delta: '+6,7%', status: 'dn', type: 'comp2', rawDiff: 200_000_000, rawRef: 3_000_000_000 },
   ],
 };
 
@@ -151,8 +151,8 @@ const EXPENSES_B: KpiViewData = {
   value: '25,8%',
   subtitle: 'доля от выручки',
   comparisons: [
-    { label: 'План:', value: '30,4%', delta: '−4,6 п.п.', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '27,8%', delta: '−2,0 п.п.', status: 'up', type: 'comp2' },
+    { label: 'План:', value: '30,4%', delta: '−4,6 п.п.', status: 'up', type: 'comp1', rawDiff: -0.046, rawRef: 0.304 },
+    { label: 'ПГ:', value: '27,8%', delta: '−2,0 п.п.', status: 'up', type: 'comp2', rawDiff: -0.020, rawRef: 0.278 },
   ],
 };
 
@@ -160,8 +160,8 @@ const MARGIN_A: KpiViewData = {
   value: '9,2 млрд',
   subtitle: '₽ валовая прибыль',
   comparisons: [
-    { label: 'План:', value: '8,1 млрд', delta: '+1,1 млрд', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '8,2 млрд', delta: '+12,2%', status: 'up', type: 'comp2' },
+    { label: 'План:', value: '8,1 млрд', delta: '+1,1 млрд', status: 'up', type: 'comp1', rawDiff: 1_100_000_000, rawRef: 8_100_000_000 },
+    { label: 'ПГ:', value: '8,2 млрд', delta: '+12,2%', status: 'up', type: 'comp2', rawDiff: 1_000_000_000, rawRef: 8_200_000_000 },
   ],
 };
 
@@ -169,8 +169,8 @@ const MARGIN_B: KpiViewData = {
   value: '74,2%',
   subtitle: 'валовая маржа',
   comparisons: [
-    { label: 'План:', value: '72,0%', delta: '+2,2 п.п.', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '76,3%', delta: '−2,1 п.п.', status: 'wn', type: 'comp2' },
+    { label: 'План:', value: '72,0%', delta: '+2,2 п.п.', status: 'up', type: 'comp1', rawDiff: 0.022, rawRef: 0.720 },
+    { label: 'ПГ:', value: '76,3%', delta: '−2,1 п.п.', status: 'wn', type: 'comp2', rawDiff: -0.021, rawRef: 0.763 },
   ],
 };
 
@@ -178,8 +178,8 @@ const CONVERSION_A: KpiViewData = {
   value: '5,63%',
   subtitle: 'посетитель → покупатель',
   comparisons: [
-    { label: 'План:', value: '5,50%', delta: '+0,13 п.п.', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '4,41%', delta: '+1,22 п.п.', status: 'up', type: 'comp2' },
+    { label: 'План:', value: '5,50%', delta: '+0,13 п.п.', status: 'up', type: 'comp1', rawDiff: 0.0013, rawRef: 0.0550 },
+    { label: 'ПГ:', value: '4,41%', delta: '+1,22 п.п.', status: 'up', type: 'comp2', rawDiff: 0.0122, rawRef: 0.0441 },
   ],
 };
 
@@ -188,7 +188,7 @@ const CONVERSION_B: KpiViewData = {
   subtitle: 'рост к ПГ',
   comparisons: [
     { label: 'План:', value: '+2,4%', delta: 'выше плана', status: 'up', type: 'comp1' },
-    { label: 'ПГ:', value: '4,41%', delta: '+27,7%', status: 'up', type: 'comp2' },
+    { label: 'ПГ:', value: '4,41%', delta: '+27,7%', status: 'up', type: 'comp2', rawDiff: 0.277, rawRef: 0.0441 },
   ],
 };
 
@@ -437,10 +437,21 @@ export const RevenueWithDetail = {
     ...Revenue.args,
     detailDataRaw:MOCK_DETAIL_RAW,
     width:380,
-    deltaFormat1A:"попав",
-    deltaFormat2A:"absolute",
-    deltaFormat1B:"percent",
-    deltaFormat2B:"percent"
+    deltaFormat1A:"п.р",
+    deltaFormat2A:"апро",
+    deltaFormat1B:"ывав",
+    deltaFormat2B:"percent",
+    toggleLabelA:"ваап",
+    toggleLabelB:"вапв",
+    colorScheme1A:"green_down",
+    colorScheme1B:"green_down",
+    colorScheme2A:"green_down",
+    colorScheme2B:"green_down",
+    comp1Label:"выа:",
+    comp2Label:"вапва:",
+    hierarchyLabelPrimary:"вып",
+    hierarchyLabelSecondary:"ывапыва",
+    aggregationTypeA:"AVERAGE"
   },
 };
 
