@@ -517,10 +517,10 @@ export const SearchBox = styled.div`
   gap: 6px;
   border: 1px solid var(--g200);
   border-radius: 7px;
-  padding: 0 4px 0 12px;
+  padding: 0 3px 0 12px;
   height: 32px;
   flex: 1;
-  max-width: 360px;
+  max-width: 420px;
   transition: border-color 0.15s ${EASE};
 
   &:focus-within {
@@ -554,14 +554,15 @@ export const SearchInput = styled.input`
   }
 `;
 
-/** Segmented toggle for search scope (by group / by child) */
+/** Segmented toggle for search scope — sits inside SearchBox */
 export const SearchScopeToggle = styled.div`
   display: flex;
   gap: 1px;
   background: var(--g100);
-  border-radius: 5px;
+  border-radius: 4px;
   padding: 2px;
   flex-shrink: 0;
+  margin-left: 2px;
 `;
 
 export const SearchScopeButton = styled.button<{ active: boolean }>`
@@ -571,14 +572,23 @@ export const SearchScopeButton = styled.button<{ active: boolean }>`
   font-size: 10px;
   font-weight: 600;
   color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g500)')};
-  padding: 3px 8px;
-  border-radius: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 0.12s ${EASE};
   line-height: 1;
   white-space: nowrap;
   box-shadow: ${({ active }) =>
     active ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'};
+
+  &:hover {
+    color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g600)')};
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--c-sky);
+    outline-offset: 1px;
+  }
 `;
 
 export const ModeToggle = styled.div`
@@ -803,6 +813,17 @@ export const Chevron = styled.span<{ expanded: boolean }>`
   vertical-align: middle;
   transition: transform 0.2s ${EASE};
   transform: rotate(${({ expanded }) => (expanded ? '90deg' : '0deg')});
+`;
+
+/** Empty state row — shown when search yields no results */
+export const EmptyRow = styled.tr`
+  & > td {
+    padding: 32px 12px;
+    text-align: center;
+    font-family: var(--m);
+    font-size: 12px;
+    color: var(--g500);
+  }
 `;
 
 /** Small delta pill for table cells */

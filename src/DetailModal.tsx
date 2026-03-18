@@ -40,6 +40,7 @@ import {
   ChildRow,
   Chevron,
   TablePill,
+  EmptyRow,
   ModalFoot,
   FooterHint,
   ExportButton,
@@ -444,24 +445,23 @@ export default function DetailModal({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
             />
+            <SearchScopeToggle>
+              <SearchScopeButton
+                active={searchScope === 'group'}
+                onClick={() => { setSearchScope('group'); setExpandedGroups(new Set()); }}
+                aria-label={`Поиск по ${groupLabel}`}
+              >
+                {groupLabel}
+              </SearchScopeButton>
+              <SearchScopeButton
+                active={searchScope === 'child'}
+                onClick={() => { setSearchScope('child'); setExpandedGroups(new Set()); }}
+                aria-label={`Поиск по ${childLabel}`}
+              >
+                {childLabel}
+              </SearchScopeButton>
+            </SearchScopeToggle>
           </SearchBox>
-
-          <SearchScopeToggle>
-            <SearchScopeButton
-              active={searchScope === 'group'}
-              onClick={() => setSearchScope('group')}
-              aria-label={`Поиск по ${groupLabel}`}
-            >
-              {groupLabel}
-            </SearchScopeButton>
-            <SearchScopeButton
-              active={searchScope === 'child'}
-              onClick={() => setSearchScope('child')}
-              aria-label={`Поиск по ${childLabel}`}
-            >
-              {childLabel}
-            </SearchScopeButton>
-          </SearchScopeToggle>
 
           <FlipButton
             onClick={flipHierarchy}
@@ -500,29 +500,35 @@ export default function DetailModal({
               </THRow>
             </THead>
             <tbody>
-              {filteredData.map(group => {
-                const isExpanded = expandedGroups.has(group.name);
-                return (
-                  <React.Fragment key={group.name}>
-                    <GroupRowView
-                      group={group}
-                      expanded={isExpanded}
-                      onToggle={() => toggleGroup(group.name)}
-                      enableComp1={enableComp1}
-                      enableComp2={enableComp2}
-                    />
-                    {isExpanded &&
-                      group.children.map(child => (
-                        <ChildRowView
-                          key={child.name}
-                          row={child}
-                          enableComp1={enableComp1}
-                          enableComp2={enableComp2}
-                        />
-                      ))}
-                  </React.Fragment>
-                );
-              })}
+              {filteredData.length === 0 ? (
+                <EmptyRow>
+                  <td colSpan={colCount}>Ничего не найдено</td>
+                </EmptyRow>
+              ) : (
+                filteredData.map(group => {
+                  const isExpanded = expandedGroups.has(group.name);
+                  return (
+                    <React.Fragment key={group.name}>
+                      <GroupRowView
+                        group={group}
+                        expanded={isExpanded}
+                        onToggle={() => toggleGroup(group.name)}
+                        enableComp1={enableComp1}
+                        enableComp2={enableComp2}
+                      />
+                      {isExpanded &&
+                        group.children.map(child => (
+                          <ChildRowView
+                            key={child.name}
+                            row={child}
+                            enableComp1={enableComp1}
+                            enableComp2={enableComp2}
+                          />
+                        ))}
+                    </React.Fragment>
+                  );
+                })
+              )}
             </tbody>
           </DetailTable>
         </TableWrap>
