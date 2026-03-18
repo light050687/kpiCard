@@ -516,9 +516,9 @@ export const SearchBox = styled.div`
   align-items: center;
   gap: 6px;
   border: 1px solid var(--g200);
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 0 3px 0 12px;
-  height: 34px;
+  height: 32px;
   flex: 1;
   max-width: 460px;
   transition: border-color 0.15s ${EASE};
@@ -559,7 +559,7 @@ export const SearchScopeToggle = styled.div`
   display: flex;
   gap: 2px;
   background: var(--g100);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 2px;
   flex-shrink: 0;
   margin-left: 4px;
@@ -571,11 +571,13 @@ export const SearchScopeButton = styled.button<{ active: boolean }>`
   font-family: var(--m);
   font-size: 11px;
   font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g500)')};
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
-  transition: all 0.12s ${EASE};
+  transition: all 0.15s ${EASE};
   line-height: 1;
   white-space: nowrap;
   box-shadow: ${({ active }) =>
@@ -623,7 +625,7 @@ export const FlipButton = styled.button`
   align-items: center;
   gap: 6px;
   border: 1px solid var(--g200);
-  border-radius: 7px;
+  border-radius: 6px;
   padding: 0 12px;
   height: 32px;
   background: transparent;
@@ -633,7 +635,7 @@ export const FlipButton = styled.button`
 
   &:hover {
     border-color: var(--g300);
-    color: var(--g700);
+    color: var(--ink);
   }
 
   &:focus-visible {
@@ -820,8 +822,8 @@ export const EmptyRow = styled.tr`
   & > td {
     padding: 32px 12px;
     text-align: center;
-    font-family: var(--m);
-    font-size: 12px;
+    font-family: var(--f);
+    font-size: 13px;
     color: var(--g500);
   }
 `;
@@ -831,7 +833,7 @@ export const TablePill = styled.span<{ status: string }>`
   font-family: var(--m);
   font-size: 10px;
   font-weight: 600;
-  padding: 4px 6px;
+  padding: 4px 8px;
   border-radius: 4px;
   white-space: nowrap;
 
@@ -889,8 +891,8 @@ export const ExportButton = styled.button`
   gap: 6px;
 
   &:hover {
-    border-color: var(--c-sky);
-    color: var(--c-sky);
+    border-color: var(--g300);
+    color: var(--ink);
   }
 
   &:focus-visible {
