@@ -518,9 +518,9 @@ export const SearchBox = styled.div`
   border: 1px solid var(--g200);
   border-radius: 7px;
   padding: 0 3px 0 12px;
-  height: 32px;
+  height: 34px;
   flex: 1;
-  max-width: 420px;
+  max-width: 460px;
   transition: border-color 0.15s ${EASE};
 
   &:focus-within {
@@ -557,29 +557,29 @@ export const SearchInput = styled.input`
 /** Segmented toggle for search scope — sits inside SearchBox */
 export const SearchScopeToggle = styled.div`
   display: flex;
-  gap: 1px;
+  gap: 2px;
   background: var(--g100);
-  border-radius: 4px;
+  border-radius: 5px;
   padding: 2px;
   flex-shrink: 0;
-  margin-left: 2px;
+  margin-left: 4px;
 `;
 
 export const SearchScopeButton = styled.button<{ active: boolean }>`
   border: none;
   background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
   font-family: var(--m);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g500)')};
-  padding: 2px 7px;
-  border-radius: 3px;
+  padding: 4px 10px;
+  border-radius: 4px;
   cursor: pointer;
   transition: all 0.12s ${EASE};
   line-height: 1;
   white-space: nowrap;
   box-shadow: ${({ active }) =>
-    active ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'};
+    active ? '0 1px 3px rgba(0, 0, 0, 0.06)' : 'none'};
 
   &:hover {
     color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g600)')};
