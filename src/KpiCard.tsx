@@ -92,13 +92,18 @@ function useCountUp(target: number, duration: number, delay: number): number {
   return current;
 }
 
-function AnimatedHero({ value }: { value: string }): JSX.Element {
+function AnimatedHero({ value, skipAnimation }: { value: string; skipAnimation?: boolean }): JSX.Element {
   const parsed = parseHeroInt(value);
   const target = parsed?.num ?? 0;
-  const dur = counterDuration(target);
-  const count = useCountUp(target, dur, COUNTER_DELAY_MS);
+  const dur = skipAnimation ? 0 : counterDuration(target);
+  const count = useCountUp(target, dur, skipAnimation ? 0 : COUNTER_DELAY_MS);
 
   if (!parsed || target === 0) {
+    return <HeroValue>{value}</HeroValue>;
+  }
+
+  // When animation is skipped, show target directly
+  if (skipAnimation) {
     return <HeroValue>{value}</HeroValue>;
   }
 
@@ -153,7 +158,7 @@ function ViewContent({
 }): JSX.Element {
   return (
     <>
-      <AnimatedHero value={view.value} />
+      <AnimatedHero value={view.value} skipAnimation={skipAnimation} />
       {view.subtitle && <Subtitle>{view.subtitle}</Subtitle>}
       {view.comparisons.length > 0 && (
         <ComparisonSection skipAnimation={skipAnimation}>
@@ -223,6 +228,157 @@ export default function KpiCard({
   const [activeMode, setActiveMode] = useState<'a' | 'b'>('a');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [hasAnimated, setHasAnimated] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // ── Hide Superset dashboard chart wrapper (title, background, shadow) ──
+  // Keep the three-dot menu (⋮) accessible but hide title text and wrapper chrome
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+
+    // Inject global CSS once for all KPI Card instances
+    const STYLE_ID = 'kpi-card-superset-wrapper-reset';
+    if (!document.getElementById(STYLE_ID)) {
+      const style = document.createElement('style');
+      style.id = STYLE_ID;
+      style.textContent = `
+        /* ── KPI Card: seamless dashboard integration ── */
+
+        /* Remove background/shadow from ALL possible wrapper layers */
+        div[data-test-viz-type="ext-kpi-card"],
+        div[data-test-viz-type="ext-kpi-card"] .chart-container,
+        div[data-test-viz-type="ext-kpi-card"] .dashboard-chart,
+        div[data-test-viz-type="ext-kpi-card"] .chart-slice {
+          background: transparent !important;
+          box-shadow: none !important;
+          border: none !important;
+          overflow: visible !important;
+        }
+
+        /*
+         * SliceHeader: collapse to 0 height but keep overflow visible
+         * so the three-dot menu floats over the card.
+         * Superset calculates: chartHeight = totalHeight - headerHeight.
+         * headerHeight=0 means chart gets full height.
+         */
+        div[data-test-viz-type="ext-kpi-card"] > [class*="SliceHeader"],
+        div[data-test-viz-type="ext-kpi-card"] > .slice-header,
+        div[data-test-viz-type="ext-kpi-card"] > div:first-child {
+          height: 0 !important;
+          min-height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          overflow: visible !important;
+          background: transparent !important;
+          border: none !important;
+          position: relative !important;
+          z-index: 50 !important;
+        }
+
+        /* Hide title text, keep only the controls (three-dot menu) */
+        div[data-test-viz-type="ext-kpi-card"] .header-title,
+        div[data-test-viz-type="ext-kpi-card"] [data-test="slice-header-title"] {
+          display: none !important;
+        }
+
+        /* Position the three-dot menu in top-right corner */
+        div[data-test-viz-type="ext-kpi-card"] [data-test="slice-header-controls"],
+        div[data-test-viz-type="ext-kpi-card"] .slice-header-controls-trigger,
+        div[data-test-viz-type="ext-kpi-card"] > div:first-child {
+          display: flex !important;
+          justify-content: flex-end !important;
+        }
+        div[data-test-viz-type="ext-kpi-card"] > div:first-child > * {
+          visibility: hidden !important;
+        }
+        div[data-test-viz-type="ext-kpi-card"] > div:first-child > *:last-child {
+          visibility: visible !important;
+          position: absolute !important;
+          top: 8px !important;
+          right: 8px !important;
+          z-index: 100 !important;
+        }
+
+        /* chart-slice: relative for absolute children */
+        div[data-test-viz-type="ext-kpi-card"].chart-slice {
+          position: relative !important;
+          overflow: visible !important;
+        }
+
+        /* dashboard-chart wrapper: no extra spacing */
+        div[data-test-viz-type="ext-kpi-card"] .dashboard-chart {
+          overflow: visible !important;
+        }
+
+        /* Parent holder — use :has() with fallback */
+        .dashboard-component-chart-holder:has(div[data-test-viz-type="ext-kpi-card"]) {
+          background: transparent !important;
+          box-shadow: none !important;
+          border: none !important;
+          border-radius: 0 !important;
+          padding: 0 !important;
+          overflow: visible !important;
+        }
+
+        /* Ensure chart fills container edge-to-edge */
+        div[data-test-viz-type="ext-kpi-card"] .slice-container {
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        div[data-test-viz-type="ext-kpi-card"] .superset-legacy-chart,
+        div[data-test-viz-type="ext-kpi-card"] .chart-container > div {
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Fallback: direct DOM manipulation for browsers without :has()
+    const chartSlice = el.closest('.chart-slice') as HTMLElement | null;
+    if (chartSlice) {
+      chartSlice.style.position = 'relative';
+      chartSlice.style.overflow = 'visible';
+      chartSlice.style.background = 'transparent';
+      chartSlice.style.boxShadow = 'none';
+      chartSlice.style.border = 'none';
+
+      // Collapse SliceHeader to 0 height
+      const header = chartSlice.querySelector(':scope > div:first-child') as HTMLElement | null;
+      if (header) {
+        header.style.height = '0';
+        header.style.minHeight = '0';
+        header.style.padding = '0';
+        header.style.margin = '0';
+        header.style.overflow = 'visible';
+        header.style.background = 'transparent';
+        header.style.border = 'none';
+        header.style.position = 'relative';
+        header.style.zIndex = '50';
+      }
+
+      // Hide title text
+      const title = chartSlice.querySelector('.header-title') as HTMLElement | null;
+      if (title) title.style.display = 'none';
+
+      // Dashboard chart wrapper
+      const dashChart = chartSlice.querySelector('.dashboard-chart') as HTMLElement | null;
+      if (dashChart) {
+        dashChart.style.overflow = 'visible';
+        dashChart.style.background = 'transparent';
+      }
+    }
+
+    // Parent holder
+    const holder = el.closest('.dashboard-component-chart-holder') as HTMLElement | null;
+    if (holder) {
+      holder.style.background = 'transparent';
+      holder.style.boxShadow = 'none';
+      holder.style.border = 'none';
+      holder.style.padding = '0';
+      holder.style.overflow = 'visible';
+    }
+  }, []);
 
   // Disable entrance animations after initial render completes
   useEffect(() => {
@@ -238,6 +394,7 @@ export default function KpiCard({
   if (dataState === 'empty') {
     return (
       <KpiCardRoot
+        ref={rootRef}
         width={width}
         height={height}
         data-theme={isDarkMode ? 'dark' : 'light'}
@@ -430,6 +587,7 @@ export default function KpiCard({
 
   return (
     <KpiCardRoot
+      ref={rootRef}
       width={width}
       height={height}
       data-theme={isDarkMode ? 'dark' : 'light'}

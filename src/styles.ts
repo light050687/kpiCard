@@ -106,10 +106,12 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
     --c-sky: ${D.cSky};
   }
 
-  width: ${({ width }) => width}px;
+  width: 100%;
   max-width: 100%;
-  min-height: ${({ height }) => height}px;
+  min-height: 100%;
   height: auto;
+  box-sizing: border-box;
+  overflow: visible;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -278,8 +280,8 @@ export const DataContainer = styled.div`
 export const DataLayer = styled.div`
   grid-area: 1 / 1;
   transition:
-    opacity 0.3s ${EASE},
-    transform 0.3s ${EASE};
+    opacity 0.15s ${EASE},
+    transform 0.15s ${EASE};
   will-change: opacity, transform;
 `;
 
