@@ -252,8 +252,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const detailColComp2 = formData.detailColComp2 || '';
   const detailColDelta2 = formData.detailColDelta2 || 'Дельта';
 
-  const comp1Label = formData.comp1Label || 'ПГ:';
-  const comp2Label = formData.comp2Label || 'ПЛАН:';
+  const comp1Label = formData.comp1Label || 'ПЛАН:';
+  const comp2Label = formData.comp2Label || 'ПГ:';
   const showDelta1 = formData.showDelta1 ?? true;
   const showDelta2 = formData.showDelta2 ?? true;
 

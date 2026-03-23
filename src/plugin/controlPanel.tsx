@@ -644,7 +644,7 @@ const config: ControlPanelConfig = {
             config: {
               type: 'TextControl',
               label: t('Название сравнения 1'),
-              default: 'ПГ:',
+              default: 'ПЛАН:',
               renderTrigger: true,
               visibility: isComp1Enabled,
             },
@@ -680,7 +680,7 @@ const config: ControlPanelConfig = {
             config: {
               type: 'TextControl',
               label: t('Название сравнения 2'),
-              default: 'ПЛАН:',
+              default: 'ПГ:',
               renderTrigger: true,
               visibility: isComp2Enabled,
             },

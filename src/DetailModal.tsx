@@ -372,8 +372,14 @@ export default function DetailModal({
   /* ── Sorting ── */
   const parseNumeric = (s: string | undefined): number => {
     if (!s) return 0;
+    // Detect Russian abbreviation multiplier
+    let multiplier = 1;
+    if (/млрд/i.test(s)) multiplier = 1_000_000_000;
+    else if (/млн/i.test(s)) multiplier = 1_000_000;
+    else if (/тыс/i.test(s)) multiplier = 1_000;
+    // Handle minus sign (−) and Russian comma decimal
     const clean = s.replace(/[^\d,\-−.]/g, '').replace('−', '-').replace(',', '.');
-    return parseFloat(clean) || 0;
+    return (parseFloat(clean) || 0) * multiplier;
   };
 
   const sortedData = useMemo(() => {
