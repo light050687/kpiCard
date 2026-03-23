@@ -423,7 +423,10 @@ export default function KpiCard({
     colorScheme1B, colorScheme2B, formatDelta1B, formatDelta2B,
   );
 
-  const hasDetail = Boolean(rawRows?.length);
+  // Detail modal only available when active mode has data
+  const activeView = isA ? viewA : viewB;
+  const activeModeEmpty = activeView.value === '' && activeView.comparisons.length === 0;
+  const hasDetail = Boolean(rawRows?.length) && !activeModeEmpty;
 
   return (
     <KpiCardRoot
@@ -469,11 +472,25 @@ export default function KpiCard({
 
         <DataContainer>
           <DataLayer style={layerStyle(isA, 'left')} aria-hidden={!isA}>
-            <ViewContent view={viewA} skipAnimation={hasAnimated} />
+            {viewA.value ? (
+              <ViewContent view={viewA} skipAnimation={hasAnimated} />
+            ) : (
+              <EmptyStateWrap>
+                <EmptyStateIcon aria-hidden="true">—</EmptyStateIcon>
+                <EmptyStateText>Нет данных за выбранный период</EmptyStateText>
+              </EmptyStateWrap>
+            )}
           </DataLayer>
           {isDual && (
             <DataLayer style={layerStyle(!isA, 'right')} aria-hidden={isA}>
-              <ViewContent view={viewB} skipAnimation={hasAnimated} />
+              {viewB.value ? (
+                <ViewContent view={viewB} skipAnimation={hasAnimated} />
+              ) : (
+                <EmptyStateWrap>
+                  <EmptyStateIcon aria-hidden="true">—</EmptyStateIcon>
+                  <EmptyStateText>Нет данных за выбранный период</EmptyStateText>
+                </EmptyStateWrap>
+              )}
             </DataLayer>
           )}
         </DataContainer>
