@@ -63,11 +63,21 @@ function exportToCsv(
   enableComp2: boolean,
   comp1Header: string,
   comp2Header: string,
+  factHeader: string,
+  delta1Header: string,
+  delta2Header: string,
 ): void {
   const BOM = '\uFEFF';
-  const headers = [groupLabel, childLabel, 'Факт'];
-  if (enableComp1) headers.push(comp1Header, `Δ ${comp1Header}`);
-  if (enableComp2) headers.push(comp2Header, `Δ ${comp2Header}`);
+  const headers = [groupLabel, childLabel, factHeader];
+  if (enableComp1) {
+    headers.push(comp1Header);
+    // delta1 column added only if data has deltas (delta1Header present)
+    headers.push(delta1Header);
+  }
+  if (enableComp2) {
+    headers.push(comp2Header);
+    headers.push(delta2Header);
+  }
 
   const rows: string[][] = [];
   for (const group of data) {
@@ -136,12 +146,16 @@ function GroupRowView({
   onToggle,
   enableComp1,
   enableComp2,
+  showDelta1 = true,
+  showDelta2 = true,
 }: {
   group: DetailGroup;
   expanded: boolean;
   onToggle: () => void;
   enableComp1: boolean;
   enableComp2: boolean;
+  showDelta1?: boolean;
+  showDelta2?: boolean;
 }): JSX.Element {
   const { summary } = group;
   return (
@@ -152,11 +166,11 @@ function GroupRowView({
       </td>
       <td className="r">{summary.value}</td>
       {enableComp1 && <td className="r">{summary.comp1Value ?? ''}</td>}
-      {enableComp1 && (
+      {enableComp1 && showDelta1 && (
         <DeltaCell delta={summary.comp1Delta} status={summary.comp1Status} />
       )}
       {enableComp2 && <td className="r">{summary.comp2Value ?? ''}</td>}
-      {enableComp2 && (
+      {enableComp2 && showDelta2 && (
         <DeltaCell delta={summary.comp2Delta} status={summary.comp2Status} />
       )}
     </GroupRow>
@@ -167,21 +181,25 @@ function ChildRowView({
   row,
   enableComp1,
   enableComp2,
+  showDelta1 = true,
+  showDelta2 = true,
 }: {
   row: DetailRow;
   enableComp1: boolean;
   enableComp2: boolean;
+  showDelta1?: boolean;
+  showDelta2?: boolean;
 }): JSX.Element {
   return (
     <ChildRow>
       <td>{row.name}</td>
       <td className="r">{row.value}</td>
       {enableComp1 && <td className="r">{row.comp1Value ?? ''}</td>}
-      {enableComp1 && (
+      {enableComp1 && showDelta1 && (
         <DeltaCell delta={row.comp1Delta} status={row.comp1Status} />
       )}
       {enableComp2 && <td className="r">{row.comp2Value ?? ''}</td>}
-      {enableComp2 && (
+      {enableComp2 && showDelta2 && (
         <DeltaCell delta={row.comp2Delta} status={row.comp2Status} />
       )}
     </ChildRow>
@@ -209,7 +227,19 @@ interface DetailModalProps {
   enableComp2: boolean;
   comp1Label: string;
   comp2Label: string;
+  colFact?: string;
+  colComp1?: string;
+  colDelta1?: string;
+  colComp2?: string;
+  colDelta2?: string;
+  formatComp1?: (n: number) => string;
+  formatComp2?: (n: number) => string;
+  formatDelta1?: (n: number) => string;
+  formatDelta2?: (n: number) => string;
+  showDelta1?: boolean;
+  showDelta2?: boolean;
   topN: number;
+  pageSize: number;
   isDarkMode: boolean;
 }
 
@@ -234,7 +264,19 @@ export default function DetailModal({
   enableComp2,
   comp1Label,
   comp2Label,
+  colFact = 'Факт',
+  colComp1 = '',
+  colDelta1 = 'Дельта',
+  colComp2 = '',
+  colDelta2 = 'Дельта',
+  formatComp1: fmtComp1,
+  formatComp2: fmtComp2,
+  formatDelta1: fmtDelta1,
+  formatDelta2: fmtDelta2,
+  showDelta1 = true,
+  showDelta2 = true,
   topN,
+  pageSize = 20,
 }: DetailModalProps): JSX.Element | null {
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -244,6 +286,10 @@ export default function DetailModal({
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     new Set(),
   );
+  const [currentPage, setCurrentPage] = useState(0);
+  type SortColumn = 'name' | 'value' | 'comp1Value' | 'comp1Delta' | 'comp2Value' | 'comp2Delta';
+  const [sortColumn, setSortColumn] = useState<SortColumn>('value');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   const modalRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -255,8 +301,10 @@ export default function DetailModal({
   const childLabel = isPrimary ? hierarchyLabelSecondary : hierarchyLabelPrimary;
 
   // Comparison header labels (strip trailing colon for table/CSV)
-  const comp1Header = comp1Label.replace(/:?\s*$/, '');
-  const comp2Header = comp2Label.replace(/:?\s*$/, '');
+  const comp1Header = colComp1 || comp1Label.replace(/:?\s*$/, '');
+  const comp2Header = colComp2 || comp2Label.replace(/:?\s*$/, '');
+  const delta1Header = colDelta1;
+  const delta2Header = colDelta2;
 
   /* ── Aggregate raw data on hierarchy/mode change (Req #11) ── */
 
@@ -276,11 +324,18 @@ export default function DetailModal({
         enableComp2,
         deltaFormat1,
         deltaFormat2,
+        fmtComp1,
+        fmtComp2,
+        fmtDelta1,
+        fmtDelta2,
+        showDelta1,
+        showDelta2,
       }),
     [
       detailDataRaw, isPrimary, aggregationType, topN,
       formatValue, formatDelta, colorScheme1, colorScheme2,
       enableComp1, enableComp2, deltaFormat1, deltaFormat2,
+      fmtComp1, fmtComp2, fmtDelta1, fmtDelta2, showDelta1, showDelta2,
     ],
   );
 
@@ -311,7 +366,61 @@ export default function DetailModal({
       .filter((g): g is DetailGroup => g !== null);
   }, [aggregatedData, searchQuery, searchScope]);
 
-  const groupCount = filteredData.length;
+  // Reset page on search/flip
+  useEffect(() => { setCurrentPage(0); }, [searchQuery, hierarchyMode]);
+
+  /* ── Sorting ── */
+  const parseNumeric = (s: string | undefined): number => {
+    if (!s) return 0;
+    const clean = s.replace(/[^\d,\-−.]/g, '').replace('−', '-').replace(',', '.');
+    return parseFloat(clean) || 0;
+  };
+
+  const sortedData = useMemo(() => {
+    const data = [...filteredData];
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    data.sort((a, b) => {
+      let aVal: string | number;
+      let bVal: string | number;
+      if (sortColumn === 'name') {
+        return dir * a.name.localeCompare(b.name, 'ru');
+      }
+      aVal = parseNumeric(a.summary[sortColumn]);
+      bVal = parseNumeric(b.summary[sortColumn]);
+      return dir * ((aVal as number) - (bVal as number));
+    });
+    // Sort children within each group by same column
+    return data.map(group => ({
+      ...group,
+      children: [...group.children].sort((a, b) => {
+        if (sortColumn === 'name') return dir * a.name.localeCompare(b.name, 'ru');
+        return dir * (parseNumeric(a[sortColumn]) - parseNumeric(b[sortColumn]));
+      }),
+    }));
+  }, [filteredData, sortColumn, sortDirection]);
+
+  /* ── Pagination ── */
+  const totalGroups = sortedData.length;
+  const totalPages = pageSize > 0 ? Math.ceil(totalGroups / pageSize) : 1;
+  const pagedData = pageSize > 0
+    ? sortedData.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
+    : sortedData;
+  const groupCount = totalGroups;
+
+  const handleSort = (col: SortColumn): void => {
+    if (sortColumn === col) {
+      setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortColumn(col);
+      setSortDirection('desc');
+    }
+    setCurrentPage(0);
+  };
+
+  const sortIcon = (col: SortColumn): string => {
+    if (sortColumn !== col) return '';
+    return sortDirection === 'asc' ? ' ↑' : ' ↓';
+  };
 
   /* ── Close with exit animation ── */
 
@@ -394,8 +503,8 @@ export default function DetailModal({
   /* ── Export ── */
 
   const handleExport = useCallback((): void => {
-    exportToCsv(filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header);
-  }, [filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header]);
+    exportToCsv(filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header, colFact, delta1Header, delta2Header);
+  }, [filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header, colFact, delta1Header, delta2Header]);
 
   /* ── Compute column count for table-layout ── */
 
@@ -483,19 +592,31 @@ export default function DetailModal({
           <DetailTable>
             <THead>
               <THRow>
-                <th style={{ width: nameWidth }}>{groupLabel}</th>
-                <th className="r" style={{ width: valWidth }}>Факт</th>
+                <th style={{ width: nameWidth, cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                  {groupLabel}{sortIcon('name')}
+                </th>
+                <th className="r" style={{ width: valWidth, cursor: 'pointer' }} onClick={() => handleSort('value')}>
+                  {colFact}{sortIcon('value')}
+                </th>
                 {enableComp1 && (
-                  <th className="r" style={{ width: valWidth }}>{comp1Header}</th>
+                  <th className="r" style={{ width: valWidth, cursor: 'pointer' }} onClick={() => handleSort('comp1Value')}>
+                    {comp1Header}{sortIcon('comp1Value')}
+                  </th>
                 )}
-                {enableComp1 && (
-                  <th className="r" style={{ width: deltaWidth }}>Δ</th>
+                {enableComp1 && showDelta1 && (
+                  <th className="r" style={{ width: deltaWidth, cursor: 'pointer' }} onClick={() => handleSort('comp1Delta')}>
+                    {delta1Header}{sortIcon('comp1Delta')}
+                  </th>
                 )}
                 {enableComp2 && (
-                  <th className="r" style={{ width: valWidth }}>{comp2Header}</th>
+                  <th className="r" style={{ width: valWidth, cursor: 'pointer' }} onClick={() => handleSort('comp2Value')}>
+                    {comp2Header}{sortIcon('comp2Value')}
+                  </th>
                 )}
-                {enableComp2 && (
-                  <th className="r" style={{ width: deltaWidth }}>Δ</th>
+                {enableComp2 && showDelta2 && (
+                  <th className="r" style={{ width: deltaWidth, cursor: 'pointer' }} onClick={() => handleSort('comp2Delta')}>
+                    {delta2Header}{sortIcon('comp2Delta')}
+                  </th>
                 )}
               </THRow>
             </THead>
@@ -505,33 +626,60 @@ export default function DetailModal({
                   <td colSpan={colCount}>Ничего не найдено</td>
                 </EmptyRow>
               ) : (
-                filteredData.map(group => {
+                pagedData.flatMap(group => {
                   const isExpanded = expandedGroups.has(group.name);
-                  return (
-                    <React.Fragment key={group.name}>
-                      <GroupRowView
-                        group={group}
-                        expanded={isExpanded}
-                        onToggle={() => toggleGroup(group.name)}
-                        enableComp1={enableComp1}
-                        enableComp2={enableComp2}
-                      />
-                      {isExpanded &&
-                        group.children.map(child => (
+                  return [
+                    <GroupRowView
+                      key={`g-${group.name}`}
+                      group={group}
+                      expanded={isExpanded}
+                      onToggle={() => toggleGroup(group.name)}
+                      enableComp1={enableComp1}
+                      enableComp2={enableComp2}
+                      showDelta1={showDelta1}
+                      showDelta2={showDelta2}
+                    />,
+                    ...(isExpanded
+                      ? group.children.map(child => (
                           <ChildRowView
-                            key={child.name}
+                            key={`c-${group.name}-${child.name}`}
                             row={child}
                             enableComp1={enableComp1}
                             enableComp2={enableComp2}
+                            showDelta1={showDelta1}
+                            showDelta2={showDelta2}
                           />
-                        ))}
-                    </React.Fragment>
-                  );
+                        ))
+                      : []),
+                  ];
                 })
               )}
             </tbody>
           </DetailTable>
         </TableWrap>
+
+        {/* ── Pagination ── */}
+        {totalPages > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 0', fontSize: 13, color: '#666' }}>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              style={{ cursor: currentPage === 0 ? 'default' : 'pointer', opacity: currentPage === 0 ? 0.4 : 1, background: 'none', border: 'none', fontSize: 13, color: 'inherit' }}
+            >
+              ← Назад
+            </button>
+            <span>{currentPage + 1} из {totalPages}</span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
+              disabled={currentPage >= totalPages - 1}
+              style={{ cursor: currentPage >= totalPages - 1 ? 'default' : 'pointer', opacity: currentPage >= totalPages - 1 ? 0.4 : 1, background: 'none', border: 'none', fontSize: 13, color: 'inherit' }}
+            >
+              Далее →
+            </button>
+          </div>
+        )}
 
         {/* ── Footer ── */}
         <ModalFoot>

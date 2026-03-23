@@ -8,37 +8,13 @@ import { t } from '@superset-ui/core';
 
 // ── Custom format options (Russian smart + standard D3) ──
 const NUMBER_FORMAT_OPTIONS: [string, string][] = [
-  ['RU_SMART', t('Russian smart (тыс, млн, млрд)')],
+  ['RU_SMART', t('Русский формат (тыс, млн, млрд)')],
   ...D3_FORMAT_OPTIONS,
 ];
 
-const AGGREGATION_CHOICES: [string, string][] = [
-  ['SUM', t('Sum')],
-  ['AVERAGE', t('Average')],
-  ['PERCENT', t('Percent (weighted avg, delta in п.п.)')],
-  ['MAX', t('Maximum')],
-  ['MIN', t('Minimum')],
-];
-
-const TIME_COMPARISON_CHOICES: [string, string][] = [
-  ['none', t('None')],
-  ['1 year ago', t('Previous Year (YoY)')],
-  ['1 month ago', t('Previous Month (MoM)')],
-  ['1 week ago', t('Previous Week (WoW)')],
-  ['28 days ago', t('28 Days Ago')],
-  ['52 weeks ago', t('52 Weeks Ago')],
-];
-
 const COLOR_SCHEME_CHOICES: [string, string][] = [
-  ['green_up', t('Increase is Good (revenue)')],
-  ['green_down', t('Decrease is Good (expenses)')],
-];
-
-const DELTA_FORMAT_CHOICES: [string, string][] = [
-  ['auto', t('Auto (based on aggregation)')],
-  ['percent', t('Percentage (%)')],
-  ['pp', t('Percentage Points (п.п.)')],
-  ['absolute', t('Absolute Value (₽, units)')],
+  ['green_up', t('Рост — хорошо')],
+  ['green_down', t('Снижение — хорошо')],
 ];
 
 // ── Visibility helpers ──
@@ -59,54 +35,144 @@ const isComp2Enabled = ({ controls }: ControlsMap): boolean =>
 
 const config: ControlPanelConfig = {
   controlPanelSections: [
-    // ── Section 1: Query ──
+    // ── Section 1: Time ──
     sections.legacyTimeseriesTime,
+
+    // ── Section 2: Query — Mode A ──
     {
-      label: t('Query'),
+      label: t('Запрос — Режим А'),
       expanded: true,
       controlSetRows: [
         [
           {
-            name: 'metric',
+            name: 'metric_a',
             config: {
               ...sharedControls.metric,
-              label: t('Primary Metric'),
-              description: t('Main KPI value displayed as the hero number'),
+              label: t('Основная мера'),
+              description: t('Основное значение KPI — большое число на карточке'),
             },
           },
         ],
         [
           {
-            name: 'metric_plan',
+            name: 'metric_plan_a',
             config: {
               ...sharedControls.metric,
-              label: t('Plan / Target Metric'),
-              description: t(
-                'Optional plan or target metric for comparison. Leave empty to hide plan.',
-              ),
+              label: t('Мера сравнения 1'),
+              description: t('Первая мера сравнения (например, план, бюджет)'),
               validators: [],
             },
           },
         ],
         [
           {
-            name: 'time_comparison',
+            name: 'metric_comp2_a',
             config: {
-              type: 'SelectControl',
-              label: t('Time Comparison'),
-              description: t('Compare against a previous time period'),
-              default: '1 year ago',
-              choices: TIME_COMPARISON_CHOICES,
-              renderTrigger: false,
+              ...sharedControls.metric,
+              label: t('Мера сравнения 2'),
+              description: t('Вторая мера сравнения (например, прошлый год, среднее)'),
+              validators: [],
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_delta_1a',
+            config: {
+              ...sharedControls.metric,
+              label: t('Мера дельты — Сравнение 1'),
+              description: t('Готовое значение дельты из SQL. Если не задано — дельта = факт − план.'),
+              validators: [],
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_delta_2a',
+            config: {
+              ...sharedControls.metric,
+              label: t('Мера дельты — Сравнение 2'),
+              description: t('Готовое значение дельты из SQL. Если не задано — дельта = факт − план.'),
+              validators: [],
+              visibility: isComp2Enabled,
             },
           },
         ],
       ],
     },
 
-    // ── Section 2: Card Display ──
+    // ── Section 3: Query — Mode B (only in dual mode) ──
     {
-      label: t('Card Display'),
+      label: t('Запрос — Режим Б'),
+      expanded: true,
+      controlSetRows: [
+        [
+          {
+            name: 'metric_b',
+            config: {
+              ...sharedControls.metric,
+              label: t('Основная мера'),
+              description: t('Основное значение KPI для Режима Б'),
+              validators: [],
+              visibility: isDual,
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_plan_b',
+            config: {
+              ...sharedControls.metric,
+              label: t('Мера сравнения 1'),
+              description: t('Первая мера сравнения для Режима Б'),
+              validators: [],
+              visibility: isDual,
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_comp2_b',
+            config: {
+              ...sharedControls.metric,
+              label: t('Мера сравнения 2'),
+              description: t('Вторая мера сравнения для Режима Б'),
+              validators: [],
+              visibility: isDual,
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_delta_1b',
+            config: {
+              ...sharedControls.metric,
+              label: t('Мера дельты — Сравнение 1'),
+              description: t('Готовое значение дельты из SQL. Если не задано — дельта = факт − план.'),
+              validators: [],
+              visibility: (state: ControlsMap) => isDual(state) && isComp1Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'metric_delta_2b',
+            config: {
+              ...sharedControls.metric,
+              label: t('Мера дельты — Сравнение 2'),
+              description: t('Готовое значение дельты из SQL. Если не задано — дельта = факт − план.'),
+              validators: [],
+              visibility: (state: ControlsMap) => isDual(state) && isComp2Enabled(state),
+            },
+          },
+        ],
+      ],
+    },
+
+    // ── Section 4: Card Display ──
+    {
+      label: t('Отображение карточки'),
       expanded: true,
       controlSetRows: [
         [
@@ -114,8 +180,8 @@ const config: ControlPanelConfig = {
             name: 'header_text',
             config: {
               type: 'TextControl',
-              label: t('Card Title'),
-              description: t('Defaults to metric name if empty'),
+              label: t('Заголовок карточки'),
+              description: t('По умолчанию — название метрики'),
               default: '',
               renderTrigger: true,
             },
@@ -126,14 +192,14 @@ const config: ControlPanelConfig = {
             name: 'mode_count',
             config: {
               type: 'SelectControl',
-              label: t('Display Modes'),
+              label: t('Режимы отображения'),
               description: t(
                 'Single = one view, no toggle. Dual = two views with toggle buttons.',
               ),
               default: 'dual',
               choices: [
-                ['single', t('Single Mode')],
-                ['dual', t('Dual Mode (A / B toggle)')],
+                ['single', t('Один режим')],
+                ['dual', t('Два режима (переключатель А / Б)')],
               ] as [string, string][],
               renderTrigger: true,
             },
@@ -144,7 +210,7 @@ const config: ControlPanelConfig = {
             name: 'auto_format_russian',
             config: {
               type: 'CheckboxControl',
-              label: t('Russian Number Format'),
+              label: t('Русский формат чисел'),
               description: t(
                 'Auto-format with тыс/млн/млрд, space separator, comma decimal',
               ),
@@ -156,9 +222,9 @@ const config: ControlPanelConfig = {
       ],
     },
 
-    // ── Section 3: Mode A ──
+    // ── Section 5: Mode A Settings ──
     {
-      label: t('Mode A'),
+      label: t('Настройки режима А'),
       expanded: true,
       controlSetRows: [
         [
@@ -166,8 +232,7 @@ const config: ControlPanelConfig = {
             name: 'toggle_label_a',
             config: {
               type: 'TextControl',
-              label: t('Toggle Button Label'),
-              description: t('Short label on the toggle button (e.g., "₽")'),
+              label: t('Название кнопки переключения'),
               default: '₽',
               renderTrigger: true,
               visibility: isDual,
@@ -179,8 +244,7 @@ const config: ControlPanelConfig = {
             name: 'subtitle_a',
             config: {
               type: 'TextControl',
-              label: t('Subtitle'),
-              description: t('Text below the hero value (e.g., "₽ за период")'),
+              label: t('Подзаголовок'),
               default: '₽ за период',
               renderTrigger: true,
             },
@@ -191,8 +255,7 @@ const config: ControlPanelConfig = {
             name: 'number_format_a',
             config: {
               type: 'SelectControl',
-              label: t('Number Format'),
-              description: t('How to format the hero value'),
+              label: t('Формат числа'),
               default: 'RU_SMART',
               choices: NUMBER_FORMAT_OPTIONS,
               freeForm: true,
@@ -202,45 +265,130 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'aggregation_type_a',
+            name: 'suffix_main_a',
             config: {
-              type: 'SelectControl',
-              label: t('Aggregation Type'),
-              description: t(
-                'How values are aggregated in detail drill-down. ' +
-                  'PERCENT: deltas shown in п.п. (percentage points).',
-              ),
-              default: 'SUM',
-              choices: AGGREGATION_CHOICES,
+              type: 'TextControl',
+              label: t('Суффикс основного числа'),
+              default: '',
+              placeholder: '₽, %, шт.',
               renderTrigger: true,
             },
           },
         ],
         [
           {
-            name: 'delta_format_1a',
+            name: 'decimals_main_a',
             config: {
-              type: 'SelectControl',
-              label: t('Delta Format — Comparison 1'),
-              description: t('How delta is displayed for comparison 1 (%, п.п., absolute, or custom text)'),
-              default: 'auto',
-              choices: DELTA_FORMAT_CHOICES,
-              freeForm: true,
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков после запятой'),
+              default: '',
+              placeholder: t('Авто'),
               renderTrigger: true,
             },
           },
         ],
         [
           {
-            name: 'delta_format_2a',
+            name: 'suffix_comp1_a',
             config: {
-              type: 'SelectControl',
-              label: t('Delta Format — Comparison 2'),
-              description: t('How delta is displayed for comparison 2 (%, п.п., absolute, or custom text)'),
-              default: 'auto',
-              choices: DELTA_FORMAT_CHOICES,
-              freeForm: true,
+              type: 'TextControl',
+              label: t('Суффикс — Сравнение 1'),
+              default: '',
               renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_comp1_a',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Сравнение 1'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'suffix_comp2_a',
+            config: {
+              type: 'TextControl',
+              label: t('Суффикс — Сравнение 2'),
+              default: '',
+              renderTrigger: true,
+              visibility: isComp2Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_comp2_a',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Сравнение 2'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: isComp2Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'suffix_delta1_a',
+            config: {
+              type: 'TextControl',
+              label: t('Суффикс дельты 1'),
+              default: '',
+              renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_delta1_a',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Дельта 1'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'suffix_delta2_a',
+            config: {
+              type: 'TextControl',
+              label: t('Суффикс дельты 2'),
+              default: '',
+              renderTrigger: true,
+              visibility: isComp2Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_delta2_a',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Дельта 2'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: isComp2Enabled,
             },
           },
         ],
@@ -249,8 +397,7 @@ const config: ControlPanelConfig = {
             name: 'color_scheme_1a',
             config: {
               type: 'SelectControl',
-              label: t('Color Logic — Comparison 1'),
-              description: t('Delta pill colors for comparison 1 in this mode'),
+              label: t('Цветовая логика — Сравнение 1'),
               default: 'green_up',
               choices: COLOR_SCHEME_CHOICES,
               renderTrigger: true,
@@ -262,8 +409,7 @@ const config: ControlPanelConfig = {
             name: 'color_scheme_2a',
             config: {
               type: 'SelectControl',
-              label: t('Color Logic — Comparison 2'),
-              description: t('Delta pill colors for comparison 2 in this mode'),
+              label: t('Цветовая логика — Сравнение 2'),
               default: 'green_up',
               choices: COLOR_SCHEME_CHOICES,
               renderTrigger: true,
@@ -273,9 +419,9 @@ const config: ControlPanelConfig = {
       ],
     },
 
-    // ── Section 4: Mode B (visible only in dual mode) ──
+    // ── Section 6: Mode B Settings (visible only in dual mode) ──
     {
-      label: t('Mode B'),
+      label: t('Настройки режима Б'),
       expanded: true,
       controlSetRows: [
         [
@@ -283,7 +429,7 @@ const config: ControlPanelConfig = {
             name: 'toggle_label_b',
             config: {
               type: 'TextControl',
-              label: t('Toggle Button Label'),
+              label: t('Название кнопки переключения'),
               default: '%',
               renderTrigger: true,
               visibility: isDual,
@@ -295,8 +441,8 @@ const config: ControlPanelConfig = {
             name: 'subtitle_b',
             config: {
               type: 'TextControl',
-              label: t('Subtitle'),
-              default: 'рост к ПГ',
+              label: t('Подзаголовок'),
+              default: '',
               renderTrigger: true,
               visibility: isDual,
             },
@@ -307,7 +453,7 @@ const config: ControlPanelConfig = {
             name: 'number_format_b',
             config: {
               type: 'SelectControl',
-              label: t('Number Format'),
+              label: t('Формат числа'),
               default: 'RU_SMART',
               choices: NUMBER_FORMAT_OPTIONS,
               freeForm: true,
@@ -318,12 +464,12 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'aggregation_type_b',
+            name: 'suffix_main_b',
             config: {
-              type: 'SelectControl',
-              label: t('Aggregation Type'),
-              default: 'PERCENT',
-              choices: AGGREGATION_CHOICES,
+              type: 'TextControl',
+              label: t('Суффикс основного числа'),
+              default: '',
+              placeholder: '₽, %, шт.',
               renderTrigger: true,
               visibility: isDual,
             },
@@ -331,14 +477,13 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'delta_format_1b',
+            name: 'decimals_main_b',
             config: {
-              type: 'SelectControl',
-              label: t('Delta Format — Comparison 1'),
-              description: t('How delta is displayed for comparison 1 (%, п.п., absolute, or custom text)'),
-              default: 'auto',
-              choices: DELTA_FORMAT_CHOICES,
-              freeForm: true,
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков после запятой'),
+              default: '',
+              placeholder: t('Авто'),
               renderTrigger: true,
               visibility: isDual,
             },
@@ -346,16 +491,105 @@ const config: ControlPanelConfig = {
         ],
         [
           {
-            name: 'delta_format_2b',
+            name: 'suffix_comp1_b',
             config: {
-              type: 'SelectControl',
-              label: t('Delta Format — Comparison 2'),
-              description: t('How delta is displayed for comparison 2 (%, п.п., absolute, or custom text)'),
-              default: 'auto',
-              choices: DELTA_FORMAT_CHOICES,
-              freeForm: true,
+              type: 'TextControl',
+              label: t('Суффикс — Сравнение 1'),
+              default: '',
               renderTrigger: true,
-              visibility: isDual,
+              visibility: (state: ControlsMap) => isDual(state) && isComp1Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_comp1_b',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Сравнение 1'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp1Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'suffix_comp2_b',
+            config: {
+              type: 'TextControl',
+              label: t('Суффикс — Сравнение 2'),
+              default: '',
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp2Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_comp2_b',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Сравнение 2'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp2Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'suffix_delta1_b',
+            config: {
+              type: 'TextControl',
+              label: t('Суффикс дельты 1'),
+              default: '',
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp1Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_delta1_b',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Дельта 1'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp1Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'suffix_delta2_b',
+            config: {
+              type: 'TextControl',
+              label: t('Суффикс дельты 2'),
+              default: '',
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp2Enabled(state),
+            },
+          },
+        ],
+        [
+          {
+            name: 'decimals_delta2_b',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Знаков — Дельта 2'),
+              default: '',
+              placeholder: t('Авто'),
+              renderTrigger: true,
+              visibility: (state: ControlsMap) => isDual(state) && isComp2Enabled(state),
             },
           },
         ],
@@ -364,8 +598,7 @@ const config: ControlPanelConfig = {
             name: 'color_scheme_1b',
             config: {
               type: 'SelectControl',
-              label: t('Color Logic — Comparison 1'),
-              description: t('Delta pill colors for comparison 1 in this mode'),
+              label: t('Цветовая логика — Сравнение 1'),
               default: 'green_up',
               choices: COLOR_SCHEME_CHOICES,
               renderTrigger: true,
@@ -378,8 +611,7 @@ const config: ControlPanelConfig = {
             name: 'color_scheme_2b',
             config: {
               type: 'SelectControl',
-              label: t('Color Logic — Comparison 2'),
-              description: t('Delta pill colors for comparison 2 in this mode'),
+              label: t('Цветовая логика — Сравнение 2'),
               default: 'green_up',
               choices: COLOR_SCHEME_CHOICES,
               renderTrigger: true,
@@ -390,9 +622,9 @@ const config: ControlPanelConfig = {
       ],
     },
 
-    // ── Section 5: Comparisons ──
+    // ── Section 7: Comparisons ──
     {
-      label: t('Comparisons'),
+      label: t('Сравнения'),
       expanded: true,
       controlSetRows: [
         [
@@ -400,8 +632,7 @@ const config: ControlPanelConfig = {
             name: 'enable_comp1',
             config: {
               type: 'CheckboxControl',
-              label: t('Show Comparison 1'),
-              description: t('Display first comparison row (e.g., plan/target)'),
+              label: t('Показывать сравнение 1'),
               default: true,
               renderTrigger: true,
             },
@@ -412,9 +643,21 @@ const config: ControlPanelConfig = {
             name: 'comp1_label',
             config: {
               type: 'TextControl',
-              label: t('Comparison 1 Label'),
-              description: t('Label text (e.g., "План:", "Target:", "Budget:")'),
-              default: 'План:',
+              label: t('Название сравнения 1'),
+              default: 'ПГ:',
+              renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_delta_1',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Показывать дельту — Сравнение 1'),
+              description: t('Если выключено, строка сравнения отображается без дельты (pill)'),
+              default: true,
               renderTrigger: true,
               visibility: isComp1Enabled,
             },
@@ -425,8 +668,7 @@ const config: ControlPanelConfig = {
             name: 'enable_comp2',
             config: {
               type: 'CheckboxControl',
-              label: t('Show Comparison 2'),
-              description: t('Display second comparison row (e.g., previous period)'),
+              label: t('Показывать сравнение 2'),
               default: true,
               renderTrigger: true,
             },
@@ -437,9 +679,21 @@ const config: ControlPanelConfig = {
             name: 'comp2_label',
             config: {
               type: 'TextControl',
-              label: t('Comparison 2 Label'),
-              description: t('Label text (e.g., "ПГ:", "YoY:", "vs LM:")'),
-              default: 'ПГ:',
+              label: t('Название сравнения 2'),
+              default: 'ПЛАН:',
+              renderTrigger: true,
+              visibility: isComp2Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'show_delta_2',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Показывать дельту — Сравнение 2'),
+              description: t('Если выключено, строка сравнения отображается без дельты (pill)'),
+              default: true,
               renderTrigger: true,
               visibility: isComp2Enabled,
             },
@@ -448,9 +702,9 @@ const config: ControlPanelConfig = {
       ],
     },
 
-    // ── Section 6: Detail / Drill-Down ──
+    // ── Section 8: Detail / Drill-Down ──
     {
-      label: t('Detail / Drill-Down'),
+      label: t('Детализация'),
       expanded: false,
       controlSetRows: [
         [
@@ -458,10 +712,8 @@ const config: ControlPanelConfig = {
             name: 'groupby_primary',
             config: {
               ...sharedControls.groupby,
-              label: t('Primary Group'),
-              description: t(
-                'Column for primary hierarchy level (e.g., segment, category)',
-              ),
+              label: t('Основная группировка'),
+              description: t('Колонка основного уровня иерархии'),
               multi: false,
               validators: [],
             },
@@ -472,10 +724,8 @@ const config: ControlPanelConfig = {
             name: 'groupby_secondary',
             config: {
               ...sharedControls.groupby,
-              label: t('Secondary Group'),
-              description: t(
-                'Column for secondary hierarchy level (e.g., store, region)',
-              ),
+              label: t('Вторичная группировка'),
+              description: t('Колонка вторичного уровня иерархии'),
               multi: false,
               validators: [],
             },
@@ -486,9 +736,8 @@ const config: ControlPanelConfig = {
             name: 'hierarchy_label_primary',
             config: {
               type: 'TextControl',
-              label: t('Primary Label'),
-              description: t('Display name for primary group (e.g., "Сегмент", "Category")'),
-              default: 'Сегмент',
+              label: t('Название основной группы'),
+              default: 'Магазин',
               renderTrigger: true,
             },
           },
@@ -498,9 +747,8 @@ const config: ControlPanelConfig = {
             name: 'hierarchy_label_secondary',
             config: {
               type: 'TextControl',
-              label: t('Secondary Label'),
-              description: t('Display name for secondary group (e.g., "Магазин", "Region")'),
-              default: 'Магазин',
+              label: t('Название вторичной группы'),
+              default: 'Сегмент',
               renderTrigger: true,
             },
           },
@@ -511,12 +759,84 @@ const config: ControlPanelConfig = {
             config: {
               type: 'TextControl',
               isInt: true,
-              label: t('Top N Groups'),
-              description: t(
-                'Limit detail data to top N groups by metric value. 0 = show all.',
-              ),
+              label: t('Топ N групп'),
+              description: t('Ограничить до N групп. 0 = показать все.'),
               default: 0,
               renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'detail_page_size',
+            config: {
+              type: 'TextControl',
+              isInt: true,
+              label: t('Строк на странице'),
+              description: t('Количество групп верхнего уровня на одной странице. 0 = без пагинации.'),
+              default: 20,
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'detail_col_fact',
+            config: {
+              type: 'TextControl',
+              label: t('Название колонки Факт'),
+              default: 'Факт',
+              renderTrigger: true,
+            },
+          },
+        ],
+        [
+          {
+            name: 'detail_col_comp1',
+            config: {
+              type: 'TextControl',
+              label: t('Название колонки Сравнение 1'),
+              default: '',
+              placeholder: t('Из названия сравнения'),
+              renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'detail_col_delta1',
+            config: {
+              type: 'TextControl',
+              label: t('Название колонки Дельта 1'),
+              default: 'Дельта',
+              renderTrigger: true,
+              visibility: isComp1Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'detail_col_comp2',
+            config: {
+              type: 'TextControl',
+              label: t('Название колонки Сравнение 2'),
+              default: '',
+              placeholder: t('Из названия сравнения'),
+              renderTrigger: true,
+              visibility: isComp2Enabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'detail_col_delta2',
+            config: {
+              type: 'TextControl',
+              label: t('Название колонки Дельта 2'),
+              default: 'Дельта',
+              renderTrigger: true,
+              visibility: isComp2Enabled,
             },
           },
         ],

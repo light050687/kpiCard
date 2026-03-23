@@ -1,14 +1,14 @@
 import { styled } from '@superset-ui/core';
+import { LIGHT_TOKENS as L, DARK_TOKENS as D, FONTS } from './themeTokens';
 
 /*
  * Design System v2.0 tokens as CSS custom properties.
  * Light/dark switching via `data-theme` attribute on the root container.
  *
+ * Token values are imported from themeTokens.ts (single source of truth).
  * Animations: plain CSS @keyframes injected via <style> in KpiCard.tsx.
  * Timing functions as TS constants (not CSS var()) to avoid Stylis issues.
  * Parent-hover selectors use `.kpi-card:hover` (plain CSS class).
- *
- * All values match kpi-cards-v1.html mockup exactly.
  */
 
 /* ── Shared constants (used in template literals) ── */
@@ -64,46 +64,46 @@ export const KEYFRAMES_CSS = `
 /* ── Root container with theme tokens ── */
 
 export const KpiCardRoot = styled.div<{ width: number; height: number }>`
-  --bg: #f3f3f3;
-  --s: #ffffff;
-  --ink: #0a0a0a;
-  --g50: #f7f7f7;
-  --g100: #ebebeb;
-  --g200: #dcdcdc;
-  --g300: #c0c0c0;
-  --g400: #999999;
-  --g500: #737373;
-  --g600: #555555;
-  --g700: #2e2e2e;
-  --up: #16a34a;
-  --dn: #dc2626;
-  --wn: #ccb604;
-  --up-b: rgba(22, 163, 74, 0.07);
-  --dn-b: rgba(220, 38, 38, 0.07);
-  --wn-b: rgba(204, 182, 4, 0.07);
-  --c-sky: #3b8bd9;
-  --f: 'Manrope', system-ui, sans-serif;
-  --m: 'JetBrains Mono', monospace;
+  --bg: ${L.bg};
+  --s: ${L.s};
+  --ink: ${L.ink};
+  --g50: ${L.g50};
+  --g100: ${L.g100};
+  --g200: ${L.g200};
+  --g300: ${L.g300};
+  --g400: ${L.g400};
+  --g500: ${L.g500};
+  --g600: ${L.g600};
+  --g700: ${L.g700};
+  --up: ${L.up};
+  --dn: ${L.dn};
+  --wn: ${L.wn};
+  --up-b: ${L.upBg};
+  --dn-b: ${L.dnBg};
+  --wn-b: ${L.wnBg};
+  --c-sky: ${L.cSky};
+  --f: ${FONTS.text};
+  --m: ${FONTS.mono};
 
   &[data-theme='dark'] {
-    --bg: #0f1114;
-    --s: #171a1e;
-    --ink: #e6e9ef;
-    --g50: #131619;
-    --g100: #1b1e22;
-    --g200: #272b30;
-    --g300: #363b42;
-    --g400: #555c65;
-    --g500: #7b8390;
-    --g600: #9ba3ae;
-    --g700: #c4cad2;
-    --up: #34d399;
-    --dn: #f87171;
-    --wn: #f8f571;
-    --up-b: rgba(52, 211, 153, 0.1);
-    --dn-b: rgba(248, 113, 113, 0.1);
-    --wn-b: rgba(248, 245, 113, 0.1);
-    --c-sky: #5caaf0;
+    --bg: ${D.bg};
+    --s: ${D.s};
+    --ink: ${D.ink};
+    --g50: ${D.g50};
+    --g100: ${D.g100};
+    --g200: ${D.g200};
+    --g300: ${D.g300};
+    --g400: ${D.g400};
+    --g500: ${D.g500};
+    --g600: ${D.g600};
+    --g700: ${D.g700};
+    --up: ${D.up};
+    --dn: ${D.dn};
+    --wn: ${D.wn};
+    --up-b: ${D.upBg};
+    --dn-b: ${D.dnBg};
+    --wn-b: ${D.wnBg};
+    --c-sky: ${D.cSky};
   }
 
   width: ${({ width }) => width}px;
@@ -123,7 +123,7 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
 
 /* ── Card ── */
 
-export const Card = styled.div`
+export const Card = styled.div<{ clickable?: boolean }>`
   background: var(--s);
   border: 1px solid var(--g200);
   border-radius: 10px;
@@ -133,7 +133,7 @@ export const Card = styled.div`
   width: 100%;
   display: flex;
   flex-direction: column;
-  cursor: default;
+  cursor: ${({ clickable }) => (clickable ? 'pointer' : 'default')};
   transition: border-color 0.25s ${EASE};
   animation-name: kpi-card-in;
   animation-duration: 0.6s;
@@ -143,6 +143,55 @@ export const Card = styled.div`
   &:hover {
     border-color: var(--g300);
   }
+`;
+
+/* ── Empty state ── */
+
+export const EmptyStateWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  gap: 8px;
+  flex: 1;
+`;
+
+export const EmptyStateIcon = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--g100);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--g400);
+  font-size: 18px;
+`;
+
+export const EmptyStateText = styled.div`
+  font-family: var(--f);
+  font-size: 13px;
+  color: var(--g500);
+  text-align: center;
+  line-height: 1.4;
+`;
+
+/* ── Partial state badge ── */
+
+export const PartialBadge = styled.div`
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--wn-b);
+  color: var(--wn);
+  font-family: var(--f);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  margin-left: auto;
 `;
 
 /* ── Header ── */

@@ -117,6 +117,12 @@ function formatRow(
   enableComp2: boolean,
   deltaFormat1: string,
   deltaFormat2: string,
+  fmtComp1?: (n: number) => string,
+  fmtComp2?: (n: number) => string,
+  fmtDelta1?: (n: number) => string,
+  fmtDelta2?: (n: number) => string,
+  showDelta1 = true,
+  showDelta2 = true,
 ): DetailRow {
   const row: DetailRow = {
     name,
@@ -124,17 +130,21 @@ function formatRow(
   };
 
   if (enableComp1 && comp1 != null) {
-    const d = computeDelta(metric, comp1, isPercentMode, deltaFormat1, defaultFormatDelta);
-    row.comp1Value = formatValue(comp1);
-    row.comp1Delta = d.formatted;
-    row.comp1Status = getDeltaStatus(d.status_value, colorScheme1);
+    row.comp1Value = fmtComp1 ? fmtComp1(comp1) : formatValue(comp1);
+    if (showDelta1) {
+      const d = computeDelta(metric, comp1, isPercentMode, deltaFormat1, defaultFormatDelta);
+      row.comp1Delta = fmtDelta1 ? fmtDelta1(d.status_value) : d.formatted;
+      row.comp1Status = getDeltaStatus(d.status_value, colorScheme1);
+    }
   }
 
   if (enableComp2 && comp2 != null) {
-    const d = computeDelta(metric, comp2, isPercentMode, deltaFormat2, defaultFormatDelta);
-    row.comp2Value = formatValue(comp2);
-    row.comp2Delta = d.formatted;
-    row.comp2Status = getDeltaStatus(d.status_value, colorScheme2);
+    row.comp2Value = fmtComp2 ? fmtComp2(comp2) : formatValue(comp2);
+    if (showDelta2) {
+      const d = computeDelta(metric, comp2, isPercentMode, deltaFormat2, defaultFormatDelta);
+      row.comp2Delta = fmtDelta2 ? fmtDelta2(d.status_value) : d.formatted;
+      row.comp2Status = getDeltaStatus(d.status_value, colorScheme2);
+    }
   }
 
   return row;
@@ -158,6 +168,13 @@ export interface AggregateOptions {
   enableComp2: boolean;
   deltaFormat1: DeltaFormat;
   deltaFormat2: DeltaFormat;
+  /** Per-value formatters with suffix+decimals baked in */
+  fmtComp1?: (n: number) => string;
+  fmtComp2?: (n: number) => string;
+  fmtDelta1?: (n: number) => string;
+  fmtDelta2?: (n: number) => string;
+  showDelta1?: boolean;
+  showDelta2?: boolean;
 }
 
 /**
@@ -183,14 +200,23 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
     enableComp2,
     deltaFormat1,
     deltaFormat2,
+    fmtComp1,
+    fmtComp2,
+    fmtDelta1,
+    fmtDelta2,
+    showDelta1 = true,
+    showDelta2 = true,
   } = opts;
+
+  // Filter out rows with zero metric value (ФАКТ = 0)
+  const nonZeroRows = rows.filter(r => r.metricValue !== 0);
 
   const isPercentMode = aggregationType === 'PERCENT';
 
   // ── PERCENT mode: compute metric/comp1 ratio per row ──
   // Each row becomes its metricValue/comp1Value ratio (0..1+).
   // Delta is in percentage points (п.п.).
-  let processedRows: RawDetailRow[] = rows;
+  let processedRows: RawDetailRow[] = nonZeroRows;
   let effectiveAggType: AggregationType = aggregationType;
   let effectiveFormatValue = formatValue;
   let effectiveFormatDelta = formatDelta;
@@ -254,7 +280,7 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
       const p = aggregateNullable(childRows.map(r => r.comp1Value), effectiveAggType);
       const pr = aggregateNullable(childRows.map(r => r.comp2Value), effectiveAggType);
       children.push(
-        formatRow(childName, m, p, pr, isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2),
+        formatRow(childName, m, p, pr, isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2, fmtComp1, fmtComp2, fmtDelta1, fmtDelta2, showDelta1, showDelta2),
       );
     }
 
@@ -281,7 +307,7 @@ export function aggregateDetailData(opts: AggregateOptions): DetailGroup[] {
 
     const summary = formatRow(
       groupName, summaryMetric, summaryComp1, summaryComp2,
-      isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2,
+      isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2, fmtComp1, fmtComp2, fmtDelta1, fmtDelta2, showDelta1, showDelta2,
     );
 
     result.push({ group: { name: groupName, summary, children }, rawMetric: summaryMetric });

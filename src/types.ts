@@ -1,4 +1,4 @@
-import { QueryFormData, supersetTheme } from '@superset-ui/core';
+import { QueryFormData, QueryFormMetric, supersetTheme } from '@superset-ui/core';
 
 // ═══════════════════════════════════════
 // Enums & Utility Types
@@ -10,7 +10,7 @@ export type DeltaStatus = 'up' | 'dn' | 'wn' | 'neutral';
 /** Whether "up" is good (revenue) or bad (expenses) */
 export type ComparisonColorScheme = 'green_up' | 'green_down';
 
-/** Aggregation strategy for numeric values */
+/** Aggregation strategy for numeric values (kept for KpiCard/DetailModal compatibility) */
 export type AggregationType = 'SUM' | 'PERCENT' | 'AVERAGE' | 'MAX' | 'MIN';
 
 /** How deltas are formatted — known keywords or arbitrary suffix text */
@@ -19,56 +19,116 @@ export type DeltaFormat = 'auto' | 'percent' | 'pp' | 'absolute' | (string & {})
 /** Hierarchy grouping direction */
 export type HierarchyMode = 'primary' | 'secondary';
 
+/** Component data state per Design System v2.0 (6 mandatory states) */
+export type DataState = 'loading' | 'error' | 'empty' | 'partial' | 'stale' | 'populated';
+
 // ═══════════════════════════════════════
 // Form Data (controlPanel → buildQuery → transformProps)
 // ═══════════════════════════════════════
 
-/** Form data from Superset control panel */
+/**
+ * Form data from Superset control panel (camelCase).
+ *
+ * controlPanel.tsx uses snake_case names (metric_a, metric_plan_a, …).
+ * Superset auto-converts them to camelCase in chartProps.formData.
+ * buildQuery.ts receives the original snake_case keys.
+ */
 export interface KpiCardFormData extends QueryFormData {
-  // ── Query ──
-  metric: string;
-  metric_plan?: string;
+  // ── Query — Mode A metrics ──
+  // controlPanel: metric_a → camelCase: metricA
+  metricA: QueryFormMetric;
+  metricPlanA?: QueryFormMetric;
+  metricComp2A?: QueryFormMetric;
+
+  // ── Query — Mode B metrics ──
+  metricB?: QueryFormMetric;
+  metricPlanB?: QueryFormMetric;
+  metricComp2B?: QueryFormMetric;
 
   // ── Card display ──
-  header_text?: string;
-  auto_format_russian: boolean;
+  headerText?: string;
+  autoFormatRussian: boolean;
 
   // ── Modes ──
-  mode_count: 'single' | 'dual';
-  toggle_label_a?: string;
-  toggle_label_b?: string;
-  subtitle_a?: string;
-  subtitle_b?: string;
-  number_format_a?: string;
-  number_format_b?: string;
-  aggregation_type_a: AggregationType;
-  aggregation_type_b: AggregationType;
+  modeCount: 'single' | 'dual';
+  toggleLabelA?: string;
+  toggleLabelB?: string;
+  subtitleA?: string;
+  subtitleB?: string;
+  numberFormatA?: string;
+  numberFormatB?: string;
 
   // ── Color schemes (per comparison type × per mode) ──
-  color_scheme_1a: ComparisonColorScheme;
-  color_scheme_1b: ComparisonColorScheme;
-  color_scheme_2a: ComparisonColorScheme;
-  color_scheme_2b: ComparisonColorScheme;
+  // controlPanel: color_scheme_1a → lodash camelCase → colorScheme1A
+  colorScheme1A: ComparisonColorScheme;
+  colorScheme1B: ComparisonColorScheme;
+  colorScheme2A: ComparisonColorScheme;
+  colorScheme2B: ComparisonColorScheme;
 
   // ── Delta format (per comparison type × per mode) ──
-  delta_format_1a: DeltaFormat;
-  delta_format_2a: DeltaFormat;
-  delta_format_1b: DeltaFormat;
-  delta_format_2b: DeltaFormat;
+  // controlPanel: delta_format_1a → lodash camelCase → deltaFormat1A
+  deltaFormat1A: DeltaFormat;
+  deltaFormat2A: DeltaFormat;
+  deltaFormat1B: DeltaFormat;
+  deltaFormat2B: DeltaFormat;
+
+  // ── Delta metric (optional — user-provided delta value from SQL) ──
+  metricDelta1A?: QueryFormMetric;
+  metricDelta2A?: QueryFormMetric;
+  metricDelta1B?: QueryFormMetric;
+  metricDelta2B?: QueryFormMetric;
+
+  // ── Per-value suffixes — Mode A ──
+  // controlPanel: suffix_main_a → lodash camelCase → suffixMainA
+  suffixMainA?: string;
+  suffixComp1A?: string;
+  suffixComp2A?: string;
+  suffixDelta1A?: string;
+  suffixDelta2A?: string;
+  // ── Per-value decimals — Mode A ──
+  decimalsMainA?: number;
+  decimalsComp1A?: number;
+  decimalsComp2A?: number;
+  decimalsDelta1A?: number;
+  decimalsDelta2A?: number;
+  // ── Per-value suffixes — Mode B ──
+  suffixMainB?: string;
+  suffixComp1B?: string;
+  suffixComp2B?: string;
+  suffixDelta1B?: string;
+  suffixDelta2B?: string;
+  // ── Per-value decimals — Mode B ──
+  decimalsMainB?: number;
+  decimalsComp1B?: number;
+  decimalsComp2B?: number;
+  decimalsDelta1B?: number;
+  decimalsDelta2B?: number;
+
+  // ── Detail column names ──
+  detailColFact?: string;
+  detailColComp1?: string;
+  detailColDelta1?: string;
+  detailColComp2?: string;
+  detailColDelta2?: string;
 
   // ── Comparisons ──
-  enable_comp1: boolean;
-  enable_comp2: boolean;
-  comp1_label?: string;
-  comp2_label?: string;
-  time_comparison?: string;
+  enableComp1: boolean;
+  enableComp2: boolean;
+  comp1Label?: string;
+  comp2Label?: string;
+
+  // ── Delta visibility (per comparison) ──
+  // controlPanel: show_delta_1 → lodash camelCase → showDelta1
+  showDelta1: boolean;
+  showDelta2: boolean;
 
   // ── Detail / Drill-Down ──
-  groupby_primary?: string;
-  groupby_secondary?: string;
-  hierarchy_label_primary?: string;
-  hierarchy_label_secondary?: string;
-  detail_top_n: number;
+  groupbyPrimary?: string;
+  groupbySecondary?: string;
+  hierarchyLabelPrimary?: string;
+  hierarchyLabelSecondary?: string;
+  detailTopN: number;
+  detailPageSize: number;
 }
 
 // ═══════════════════════════════════════
@@ -174,15 +234,39 @@ export interface KpiCardProps {
   deltaFormat1B: DeltaFormat;
   deltaFormat2B: DeltaFormat;
 
+  // ── Per-value formatters (suffix + decimals baked in) ──
+  formatComp1A: (n: number) => string;
+  formatComp2A: (n: number) => string;
+  formatDelta1A: (n: number) => string;
+  formatDelta2A: (n: number) => string;
+  formatComp1B: (n: number) => string;
+  formatComp2B: (n: number) => string;
+  formatDelta1B: (n: number) => string;
+  formatDelta2B: (n: number) => string;
+
+  // ── Detail column names ──
+  detailColFact: string;
+  detailColComp1: string;
+  detailColDelta1: string;
+  detailColComp2: string;
+  detailColDelta2: string;
+
   // ── Comparison visibility & labels ──
   enableComp1: boolean;
   enableComp2: boolean;
   comp1Label: string;
   comp2Label: string;
 
+  // ── Delta visibility (per comparison) ──
+  showDelta1: boolean;
+  showDelta2: boolean;
+
   // ── Hierarchy labels ──
   hierarchyLabelPrimary: string;
   hierarchyLabelSecondary: string;
+
+  // ── Data state (Design System v2.0: 6 mandatory states) ──
+  dataState: DataState;
 
   // ── Theme ──
   isDarkMode: boolean;
@@ -190,14 +274,13 @@ export interface KpiCardProps {
 
   // ── Detail data (raw rows for on-the-fly aggregation) ──
   detailDataRaw?: DetailDataRaw;
-  aggregationTypeA: AggregationType;
-  aggregationTypeB: AggregationType;
 
   // ── Formatting functions ──
   formatValueA: (n: number) => string;
   formatValueB: (n: number) => string;
   formatDelta: (n: number) => string;
 
-  // ── TOP N ──
+  // ── TOP N & Pagination ──
   detailTopN: number;
+  detailPageSize: number;
 }

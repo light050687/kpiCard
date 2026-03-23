@@ -5,6 +5,12 @@ import transformProps from './transformProps';
 import thumbnail from '../images/thumbnail.png';
 import { KpiCardFormData } from '../types';
 
+/**
+ * KPI Card plugin for Superset.
+ *
+ * Register in MainPreset.js with:
+ *   new SupersetPluginChartKpiCard().configure({ key: 'ext-kpi-card' })
+ */
 export default class SupersetPluginChartKpiCard extends ChartPlugin<KpiCardFormData> {
   constructor() {
     super({
@@ -14,8 +20,8 @@ export default class SupersetPluginChartKpiCard extends ChartPlugin<KpiCardFormD
       metadata: new ChartMetadata({
         name: 'KPI Card',
         description:
-          'Single KPI metric card with plan/YoY comparisons, abs/pct toggle, ' +
-          'and delta pills. Follows Design System v2.0.',
+          'KPI-карточка с план/ПГ сравнениями, dual-mode toggle ' +
+          'и drill-down модалью. Design System v2.0.',
         thumbnail,
         tags: ['KPI', 'Big Number', 'Comparison', 'Featured'],
         category: 'KPI Indicators',

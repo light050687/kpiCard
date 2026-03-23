@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   KpiCardProps,
   KpiViewData,
@@ -30,6 +30,10 @@ import {
   ComparisonLabel,
   ComparisonValue,
   DeltaPill,
+  EmptyStateWrap,
+  EmptyStateIcon,
+  EmptyStateText,
+  PartialBadge,
 } from './styles';
 import DetailModal from './DetailModal';
 
@@ -112,12 +116,12 @@ function AnimatedHero({ value }: { value: string }): JSX.Element {
 function layerStyle(
   visible: boolean,
   direction: 'left' | 'right',
-): React.CSSProperties {
+) {
   if (visible) {
-    return { opacity: 1, transform: 'translateX(0)', pointerEvents: 'auto' };
+    return { opacity: 1, transform: 'translateX(0)', pointerEvents: 'auto' as const };
   }
   const tx = direction === 'left' ? '-16px' : '16px';
-  return { opacity: 0, transform: `translateX(${tx})`, pointerEvents: 'none' };
+  return { opacity: 0, transform: `translateX(${tx})`, pointerEvents: 'none' as const };
 }
 
 /* ── Sub-components ────────────────────────────────────────────── */
@@ -172,6 +176,7 @@ export default function KpiCard({
   width,
   height,
   headerText,
+  dataState,
   modeCount,
   toggleLabelA,
   toggleLabelB,
@@ -185,20 +190,35 @@ export default function KpiCard({
   deltaFormat2A,
   deltaFormat1B,
   deltaFormat2B,
+  formatComp1A,
+  formatComp2A,
+  formatDelta1A,
+  formatDelta2A,
+  formatComp1B,
+  formatComp2B,
+  formatDelta1B,
+  formatDelta2B,
+  detailColFact,
+  detailColComp1,
+  detailColDelta1,
+  detailColComp2,
+  detailColDelta2,
   enableComp1,
   enableComp2,
   comp1Label,
   comp2Label,
+  showDelta1,
+  showDelta2,
   hierarchyLabelPrimary,
   hierarchyLabelSecondary,
   isDarkMode,
   detailDataRaw,
-  aggregationTypeA,
-  aggregationTypeB,
+  // aggregationType removed — always SUM-based logic
   formatValueA,
   formatValueB,
   formatDelta,
   detailTopN,
+  detailPageSize,
 }: KpiCardProps): JSX.Element {
   const [activeMode, setActiveMode] = useState<'a' | 'b'>('a');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -212,6 +232,30 @@ export default function KpiCard({
 
   const isA = activeMode === 'a';
   const isDual = modeCount === 'dual';
+  const isPartial = dataState === 'partial';
+
+  // ── Empty state — no data available ──
+  if (dataState === 'empty') {
+    return (
+      <KpiCardRoot
+        width={width}
+        height={height}
+        data-theme={isDarkMode ? 'dark' : 'light'}
+        role="figure"
+        aria-label={`${headerText}: нет данных`}
+      >
+        <Card className={CARD_CLASS}>
+          <CardHead>
+            <CardTitle>{headerText}</CardTitle>
+          </CardHead>
+          <EmptyStateWrap>
+            <EmptyStateIcon aria-hidden="true">—</EmptyStateIcon>
+            <EmptyStateText>Нет данных за выбранный период</EmptyStateText>
+          </EmptyStateWrap>
+        </Card>
+      </KpiCardRoot>
+    );
+  }
 
   const rawRows = detailDataRaw?.rows;
 
@@ -302,7 +346,7 @@ export default function KpiCard({
       comparisons.push({
         label: comp1Label,
         value: isPercent ? formatRussianPercent(comp1Num, false) : fmtValue(comp1Num),
-        delta: formatDeltaByFormat(d, comp1Num, resolveAutoFmt(deltaFmt1, aggType)),
+        delta: formatDeltaByFormat(d, comp1Num, resolveAutoFmt(deltaFmt1, aggType), isPercent),
         status,
         type: 'comp1',
         rawDiff: d,
@@ -316,7 +360,7 @@ export default function KpiCard({
       comparisons.push({
         label: comp2Label,
         value: isPercent ? formatRussianPercent(comp2Num, false) : fmtValue(comp2Num),
-        delta: formatDeltaByFormat(d, comp2Num, resolveAutoFmt(deltaFmt2, aggType)),
+        delta: formatDeltaByFormat(d, comp2Num, resolveAutoFmt(deltaFmt2, aggType), isPercent),
         status,
         type: 'comp2',
         rawDiff: d,
@@ -327,14 +371,13 @@ export default function KpiCard({
     return { value: heroStr, subtitle: baseView.subtitle, comparisons };
   };
 
-  // Filter comparisons, override labels, re-format deltas, apply colorScheme inversion
+  // Filter comparisons, override labels, apply colorScheme inversion
   const processView = (
     view: KpiViewData,
     scheme1: ComparisonColorScheme,
     scheme2: ComparisonColorScheme,
-    dFmt1: DeltaFormat,
-    dFmt2: DeltaFormat,
-    aggType: AggregationType,
+    fmtDelta1: (n: number) => string,
+    fmtDelta2: (n: number) => string,
   ): KpiViewData => ({
     ...view,
     comparisons: view.comparisons
@@ -349,13 +392,16 @@ export default function KpiCard({
         if (cmp.type === 'comp1') label = comp1Label;
         if (cmp.type === 'comp2') label = comp2Label;
 
-        // Re-format delta from raw values when available
-        if (cmp.rawDiff != null && cmp.rawRef != null) {
-          const fmt = cmp.type === 'comp2' ? dFmt2 : dFmt1;
-          delta = formatDeltaByFormat(
-            cmp.rawDiff, cmp.rawRef, resolveAutoFmt(fmt, aggType),
-            aggType === 'PERCENT',
-          );
+        // Hide delta pill if showDelta is false for this comparison
+        const isDeltaVisible = cmp.type === 'comp2' ? showDelta2 : showDelta1;
+        if (!isDeltaVisible) {
+          return { ...cmp, label, delta: '', status: 'neutral' as DeltaStatus };
+        }
+
+        // Re-format delta from raw values using per-value formatter
+        if (cmp.rawDiff != null) {
+          const fmt = cmp.type === 'comp2' ? fmtDelta2 : fmtDelta1;
+          delta = fmt(cmp.rawDiff);
         }
 
         // Apply per-comparison colorScheme
@@ -369,12 +415,12 @@ export default function KpiCard({
   });
 
   const viewA = processView(
-    recomputeFromRaw(aggregationTypeA, formatValueA, modeAView, deltaFormat1A, deltaFormat2A) ?? modeAView,
-    colorScheme1A, colorScheme2A, deltaFormat1A, deltaFormat2A, aggregationTypeA,
+    recomputeFromRaw('SUM' as const, formatValueA, modeAView, deltaFormat1A, deltaFormat2A) ?? modeAView,
+    colorScheme1A, colorScheme2A, formatDelta1A, formatDelta2A,
   );
   const viewB = processView(
-    recomputeFromRaw(aggregationTypeB, formatValueB, modeBView, deltaFormat1B, deltaFormat2B) ?? modeBView,
-    colorScheme1B, colorScheme2B, deltaFormat1B, deltaFormat2B, aggregationTypeB,
+    recomputeFromRaw('SUM' as const, formatValueB, modeBView, deltaFormat1B, deltaFormat2B) ?? modeBView,
+    colorScheme1B, colorScheme2B, formatDelta1B, formatDelta2B,
   );
 
   const hasDetail = Boolean(rawRows?.length);
@@ -387,17 +433,18 @@ export default function KpiCard({
       role="figure"
       aria-label={`${headerText}: ${modeAView.value}`}
     >
-      {/* Plain CSS @keyframes — bypasses Emotion/Stylis */}
+      {/* XSS-safe: KEYFRAMES_CSS is a compile-time constant string, never user input */}
       {/* eslint-disable-next-line react/no-danger */}
       <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
 
       <Card
         className={CARD_CLASS}
+        clickable={hasDetail}
         onClick={hasDetail ? () => setIsModalOpen(true) : undefined}
-        style={hasDetail ? { cursor: 'pointer' } : undefined}
       >
         <CardHead>
           <CardTitle>{headerText}</CardTitle>
+          {isPartial && <PartialBadge>Частичные данные</PartialBadge>}
           {isDual && (
             <ToggleGroup role="tablist" aria-label="Toggle mode A / B">
               <ToggleButton
@@ -439,13 +486,24 @@ export default function KpiCard({
           title={headerText}
           headerValue={isA ? viewA.value : viewB.value}
           detailDataRaw={detailDataRaw}
-          aggregationType={isA ? aggregationTypeA : aggregationTypeB}
+          aggregationType={isA ? 'SUM' as const : 'SUM' as const}
           colorScheme1={isA ? colorScheme1A : colorScheme1B}
           colorScheme2={isA ? colorScheme2A : colorScheme2B}
           deltaFormat1={isA ? deltaFormat1A : deltaFormat1B}
           deltaFormat2={isA ? deltaFormat2A : deltaFormat2B}
           formatValue={isA ? formatValueA : formatValueB}
           formatDelta={formatDelta}
+          formatComp1={isA ? formatComp1A : formatComp1B}
+          formatComp2={isA ? formatComp2A : formatComp2B}
+          formatDelta1={isA ? formatDelta1A : formatDelta1B}
+          formatDelta2={isA ? formatDelta2A : formatDelta2B}
+          showDelta1={showDelta1}
+          showDelta2={showDelta2}
+          colFact={detailColFact}
+          colComp1={detailColComp1}
+          colDelta1={detailColDelta1}
+          colComp2={detailColComp2}
+          colDelta2={detailColDelta2}
           hierarchyLabelPrimary={hierarchyLabelPrimary}
           hierarchyLabelSecondary={hierarchyLabelSecondary}
           enableComp1={enableComp1}
@@ -453,6 +511,7 @@ export default function KpiCard({
           comp1Label={comp1Label}
           comp2Label={comp2Label}
           topN={detailTopN}
+          pageSize={detailPageSize}
           isDarkMode={isDarkMode}
         />
       )}
