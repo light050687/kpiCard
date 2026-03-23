@@ -294,18 +294,22 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const deltaValue2A = delta2ALabel ? extractMetricValue(summaryData, delta2ALabel) : null;
 
   // ── Mode B metrics ──
-  const metricBLabel = formData.metricB ? getMetricLabel(formData.metricB) : metricALabel;
+  // If metricB is not set, Mode B is completely empty — no comparisons, no deltas
+  const hasModeB = Boolean(formData.metricB);
+  const metricBLabel = hasModeB ? getMetricLabel(formData.metricB!) : '';
   const mainValueB = metricBLabel ? (extractMetricValue(summaryData, metricBLabel) ?? 0) : 0;
 
-  const usedKeysB = new Set<string>([metricBLabel].filter(Boolean));
-  const comp1B = resolveMetricValue(formData.metricPlanB, summaryData, usedKeysB);
-  if (comp1B.label) usedKeysB.add(comp1B.label);
-  const comp2B = resolveMetricValue(formData.metricComp2B, summaryData, usedKeysB);
+  const comp1B = hasModeB
+    ? (() => { const keys = new Set<string>([metricBLabel].filter(Boolean)); return resolveMetricValue(formData.metricPlanB, summaryData, keys); })()
+    : { label: null, value: null };
+  const comp2B = hasModeB
+    ? (() => { const keys = new Set<string>([metricBLabel, comp1B.label].filter(Boolean) as string[]); return resolveMetricValue(formData.metricComp2B, summaryData, keys); })()
+    : { label: null, value: null };
 
   // ── Delta metrics Mode B ──
-  const delta1BLabel = formData.metricDelta1B ? getMetricLabel(formData.metricDelta1B) : null;
+  const delta1BLabel = hasModeB && formData.metricDelta1B ? getMetricLabel(formData.metricDelta1B) : null;
   const deltaValue1B = delta1BLabel ? extractMetricValue(summaryData, delta1BLabel) : null;
-  const delta2BLabel = formData.metricDelta2B ? getMetricLabel(formData.metricDelta2B) : null;
+  const delta2BLabel = hasModeB && formData.metricDelta2B ? getMetricLabel(formData.metricDelta2B) : null;
   const deltaValue2B = delta2BLabel ? extractMetricValue(summaryData, delta2BLabel) : null;
 
   // ── Build Mode A view ──
@@ -330,25 +334,28 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   });
 
   // ── Build Mode B view ──
-  const modeBView = buildModeView({
-    mainValue: mainValueB,
-    comp1Value: comp1B.value,
-    comp2Value: comp2B.value,
-    colorScheme1: colorScheme1B,
-    colorScheme2: colorScheme2B,
-    subtitle: formData.subtitleB || '',
-    enableComp1,
-    enableComp2,
-    comp1Label,
-    comp2Label,
-    deltaValue1: deltaValue1B,
-    deltaValue2: deltaValue2B,
-    fmtMain: fmtMainB,
-    fmtComp1: fmtComp1B,
-    fmtComp2: fmtComp2B,
-    fmtDelta1: fmtDelta1B,
-    fmtDelta2: fmtDelta2B,
-  });
+  // If Mode B metrics are not configured, show empty view
+  const modeBView: KpiViewData = hasModeB
+    ? buildModeView({
+        mainValue: mainValueB,
+        comp1Value: comp1B.value,
+        comp2Value: comp2B.value,
+        colorScheme1: colorScheme1B,
+        colorScheme2: colorScheme2B,
+        subtitle: formData.subtitleB || '',
+        enableComp1,
+        enableComp2,
+        comp1Label,
+        comp2Label,
+        deltaValue1: deltaValue1B,
+        deltaValue2: deltaValue2B,
+        fmtMain: fmtMainB,
+        fmtComp1: fmtComp1B,
+        fmtComp2: fmtComp2B,
+        fmtDelta1: fmtDelta1B,
+        fmtDelta2: fmtDelta2B,
+      })
+    : { value: '', subtitle: '', comparisons: [] };
 
   // ── Detail data (Query 1, if present) — uses Mode A metrics ──
   let detailDataRaw: DetailDataRaw | undefined;
