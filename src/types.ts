@@ -167,6 +167,10 @@ export interface RawDetailRow {
   metricValue: number;
   comp1Value: number | null;
   comp2Value: number | null;
+  /** User-provided delta value from SQL (metric_delta_1a) */
+  delta1Value: number | null;
+  /** User-provided delta value from SQL (metric_delta_2a) */
+  delta2Value: number | null;
 }
 
 /** Raw detail data passed from transformProps to component */

@@ -189,6 +189,8 @@ function extractDetailRows(
   metricLabel: string,
   comp1MetricLabel: string | null,
   comp2MetricLabel: string | null,
+  delta1MetricLabel: string | null,
+  delta2MetricLabel: string | null,
 ): DetailDataRaw {
   const result: RawDetailRow[] = rows.map(row => ({
     primaryGroup: primaryCol ? String(row[primaryCol] ?? 'N/A') : 'Total',
@@ -196,6 +198,8 @@ function extractDetailRows(
     metricValue: Number(row[metricLabel] ?? 0),
     comp1Value: comp1MetricLabel ? Number(row[comp1MetricLabel] ?? 0) : null,
     comp2Value: comp2MetricLabel ? Number(row[comp2MetricLabel] ?? 0) : null,
+    delta1Value: delta1MetricLabel != null ? Number(row[delta1MetricLabel] ?? 0) : null,
+    delta2Value: delta2MetricLabel != null ? Number(row[delta2MetricLabel] ?? 0) : null,
   }));
 
   return { rows: result };
@@ -369,6 +373,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         metricALabel,
         comp1A.label,
         comp2A.label,
+        delta1ALabel,
+        delta2ALabel,
       );
     }
   }

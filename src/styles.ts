@@ -27,9 +27,8 @@ export const CARD_CLASS = 'kpi-card';
 
 export const KEYFRAMES_CSS = `
 @keyframes kpi-card-in{
-  0%{opacity:0;transform:translateY(24px) scale(.93);filter:blur(6px)}
-  50%{filter:blur(1px)}
-  100%{opacity:1;transform:translateY(0) scale(1);filter:blur(0)}
+  from{opacity:0}
+  to{opacity:1}
 }
 @keyframes kpi-sub-in{
   from{opacity:0;transform:translateX(-8px)}
@@ -107,11 +106,11 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
   }
 
   width: 100%;
-  max-width: 100%;
-  min-height: 100%;
-  height: auto;
+  height: 100%;
   box-sizing: border-box;
   overflow: visible;
+  padding: 0;
+  margin: 0;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -133,6 +132,7 @@ export const Card = styled.div<{ clickable?: boolean }>`
   overflow: hidden;
   position: relative;
   width: 100%;
+  flex: 1;
   display: flex;
   flex-direction: column;
   cursor: ${({ clickable }) => (clickable ? 'pointer' : 'default')};

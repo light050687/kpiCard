@@ -256,68 +256,36 @@ export default function KpiCard({
         }
 
         /*
-         * SliceHeader: collapse to 0 height but keep overflow visible
-         * so the three-dot menu floats over the card.
-         * Superset calculates: chartHeight = totalHeight - headerHeight.
-         * headerHeight=0 means chart gets full height.
+         * SliceHeader: display:none so Superset measures headerHeight=0.
+         * chartHeight = totalHeight - 0 = totalHeight → card fills 100%.
+         * Three-dot menu is moved INSIDE the KpiCard component.
          */
-        div[data-test-viz-type="ext-kpi-card"] > [class*="SliceHeader"],
-        div[data-test-viz-type="ext-kpi-card"] > .slice-header,
-        div[data-test-viz-type="ext-kpi-card"] > div:first-child {
-          height: 0 !important;
-          min-height: 0 !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          overflow: visible !important;
-          background: transparent !important;
-          border: none !important;
-          position: relative !important;
-          z-index: 50 !important;
-        }
-
-        /* Hide title text, keep only the controls (three-dot menu) */
-        div[data-test-viz-type="ext-kpi-card"] .header-title,
-        div[data-test-viz-type="ext-kpi-card"] [data-test="slice-header-title"] {
+        div[data-test-viz-type="ext-kpi-card"].chart-slice > div:first-child {
           display: none !important;
         }
 
-        /* Position the three-dot menu in top-right corner */
-        div[data-test-viz-type="ext-kpi-card"] [data-test="slice-header-controls"],
-        div[data-test-viz-type="ext-kpi-card"] .slice-header-controls-trigger,
-        div[data-test-viz-type="ext-kpi-card"] > div:first-child {
-          display: flex !important;
-          justify-content: flex-end !important;
-        }
-        div[data-test-viz-type="ext-kpi-card"] > div:first-child > * {
-          visibility: hidden !important;
-        }
-        div[data-test-viz-type="ext-kpi-card"] > div:first-child > *:last-child {
-          visibility: visible !important;
-          position: absolute !important;
-          top: 8px !important;
-          right: 8px !important;
-          z-index: 100 !important;
-        }
-
-        /* chart-slice: relative for absolute children */
+        /* chart-slice (SliceContainer): fill holder */
         div[data-test-viz-type="ext-kpi-card"].chart-slice {
           position: relative !important;
           overflow: visible !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
 
         /* dashboard-chart wrapper: no extra spacing */
         div[data-test-viz-type="ext-kpi-card"] .dashboard-chart {
           overflow: visible !important;
+          padding: 0 !important;
+          margin: 0 !important;
         }
 
-        /* Parent holder — use :has() with fallback */
-        .dashboard-component-chart-holder:has(div[data-test-viz-type="ext-kpi-card"]) {
+        /* Parent holder — transparent, no padding so card touches grid border */
+        .dashboard-component-chart-holder:has(div[data-test-viz-type="ext-kpi-card"]),
+        [data-test="dashboard-component-chart-holder"]:has(div[data-test-viz-type="ext-kpi-card"]) {
           background: transparent !important;
           box-shadow: none !important;
-          border: none !important;
-          border-radius: 0 !important;
-          padding: 0 !important;
           overflow: visible !important;
+          padding: 0 !important;
         }
 
         /* Ensure chart fills container edge-to-edge */
@@ -342,24 +310,14 @@ export default function KpiCard({
       chartSlice.style.background = 'transparent';
       chartSlice.style.boxShadow = 'none';
       chartSlice.style.border = 'none';
+      chartSlice.style.padding = '0';
+      chartSlice.style.margin = '0';
 
-      // Collapse SliceHeader to 0 height
+      // Hide SliceHeader completely — Superset will measure headerHeight=0
       const header = chartSlice.querySelector(':scope > div:first-child') as HTMLElement | null;
       if (header) {
-        header.style.height = '0';
-        header.style.minHeight = '0';
-        header.style.padding = '0';
-        header.style.margin = '0';
-        header.style.overflow = 'visible';
-        header.style.background = 'transparent';
-        header.style.border = 'none';
-        header.style.position = 'relative';
-        header.style.zIndex = '50';
+        header.style.display = 'none';
       }
-
-      // Hide title text
-      const title = chartSlice.querySelector('.header-title') as HTMLElement | null;
-      if (title) title.style.display = 'none';
 
       // Dashboard chart wrapper
       const dashChart = chartSlice.querySelector('.dashboard-chart') as HTMLElement | null;
@@ -369,15 +327,12 @@ export default function KpiCard({
       }
     }
 
-    // Parent holder
+    // Parent holder — transparent, no padding so card touches grid border
     const holder = el.closest('.dashboard-component-chart-holder') as HTMLElement | null;
     if (holder) {
-      holder.style.background = 'transparent';
-      holder.style.boxShadow = 'none';
-      holder.style.border = 'none';
-      holder.style.padding = '0';
-      holder.style.overflow = 'visible';
+      holder.style.cssText += ';background:transparent!important;box-shadow:none!important;overflow:visible!important;padding:0!important;';
     }
+
   }, []);
 
   // Disable entrance animations after initial render completes
