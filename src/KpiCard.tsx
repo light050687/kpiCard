@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   KpiCardProps,
   KpiViewData,
@@ -177,7 +177,23 @@ function ViewContent({
 
 /* ── Main component ────────────────────────────────────────────── */
 
-export default function KpiCard({
+/**
+ * Shallow compare for React.memo — skip function props (formatters)
+ * which are recreated on every transformProps call.
+ * This prevents Superset's framework from triggering full re-renders.
+ */
+function arePropsEqual(prev: KpiCardProps, next: KpiCardProps): boolean {
+  // Compare all non-function props
+  const keys = Object.keys(next) as (keyof KpiCardProps)[];
+  for (const key of keys) {
+    if (typeof next[key] === 'function') continue; // skip formatters
+    if (key === 'theme') continue; // theme object changes reference often
+    if (prev[key] !== next[key]) return false;
+  }
+  return true;
+}
+
+const KpiCardMemo = React.memo(function KpiCardInner({
   width,
   height,
   headerText,
@@ -256,12 +272,19 @@ export default function KpiCard({
         }
 
         /*
-         * SliceHeader: display:none so Superset measures headerHeight=0.
-         * chartHeight = totalHeight - 0 = totalHeight → card fills 100%.
-         * Three-dot menu is moved INSIDE the KpiCard component.
+         * SliceHeader: height:0 + overflow:visible.
+         * Superset measures headerHeight via offsetHeight which returns 0.
+         * Dots button floats out via overflow:visible + position:absolute.
          */
         div[data-test-viz-type="ext-kpi-card"].chart-slice > div:first-child {
-          display: none !important;
+          height: 0 !important;
+          min-height: 0 !important;
+          max-height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+          overflow: visible !important;
+          pointer-events: none !important;
         }
 
         /* chart-slice (SliceContainer): fill holder */
@@ -313,10 +336,64 @@ export default function KpiCard({
       chartSlice.style.padding = '0';
       chartSlice.style.margin = '0';
 
-      // Hide SliceHeader completely — Superset will measure headerHeight=0
+      // SliceHeader: find dots button FIRST (before hiding), then hide.
       const header = chartSlice.querySelector(':scope > div:first-child') as HTMLElement | null;
       if (header) {
-        header.style.display = 'none';
+        // Find dots button BEFORE hiding
+        const dotsBtn = header.querySelector('.ant-dropdown-trigger') as HTMLElement | null;
+
+        // Hide header title but keep it in DOM flow at height 0
+        // so React events still work on the dots button
+        header.style.cssText = [
+          'height: 0 !important',
+          'min-height: 0 !important',
+          'max-height: 0 !important',
+          'padding: 0 !important',
+          'margin: 0 !important',
+          'border: none !important',
+          'overflow: visible !important',
+          'background: transparent !important',
+          'position: relative !important',
+          'pointer-events: none !important',
+        ].join(';');
+
+        // Hide all children
+        Array.from(header.children).forEach(child => {
+          (child as HTMLElement).style.cssText = 'visibility:hidden!important;pointer-events:none!important;height:0!important;overflow:hidden!important;';
+        });
+
+        // Show ONLY the dots button, positioned over our card
+        if (dotsBtn) {
+          const controlsDiv = dotsBtn.closest('.header-controls') as HTMLElement | null;
+          if (controlsDiv) {
+            controlsDiv.style.cssText = [
+              'visibility: visible !important',
+              'pointer-events: auto !important',
+              'position: absolute !important',
+              'top: 8px !important',
+              'right: 2px !important',
+              'z-index: 100 !important',
+              'height: auto !important',
+              'overflow: visible !important',
+              'opacity: 0',
+              'transition: opacity 0.15s ease',
+            ].join(';');
+          }
+          dotsBtn.style.cssText += ';visibility:visible!important;pointer-events:auto!important;';
+
+          // Show dots only on card hover (with proper cleanup)
+          const target = controlsDiv || dotsBtn;
+          const onEnter = () => { target.style.opacity = '1'; };
+          const onLeave = () => { target.style.opacity = '0'; };
+          el.addEventListener('mouseenter', onEnter);
+          el.addEventListener('mouseleave', onLeave);
+
+          // Store cleanup refs
+          (el as any).__kpiDotsCleanup = () => {
+            el.removeEventListener('mouseenter', onEnter);
+            el.removeEventListener('mouseleave', onLeave);
+          };
+        }
       }
 
       // Dashboard chart wrapper
@@ -333,6 +410,13 @@ export default function KpiCard({
       holder.style.cssText += ';background:transparent!important;box-shadow:none!important;overflow:visible!important;padding:0!important;';
     }
 
+    return () => {
+      // Cleanup event listeners to prevent memory leak
+      if (el && (el as any).__kpiDotsCleanup) {
+        (el as any).__kpiDotsCleanup();
+        delete (el as any).__kpiDotsCleanup;
+      }
+    };
   }, []);
 
   // Disable entrance animations after initial render completes
@@ -526,14 +610,18 @@ export default function KpiCard({
       }),
   });
 
-  const viewA = processView(
+  const viewA = useMemo(() => processView(
     recomputeFromRaw('SUM' as const, formatValueA, modeAView, deltaFormat1A, deltaFormat2A) ?? modeAView,
     colorScheme1A, colorScheme2A, formatDelta1A, formatDelta2A,
-  );
-  const viewB = processView(
+  ), [modeAView, colorScheme1A, colorScheme2A, deltaFormat1A, deltaFormat2A,
+      formatValueA, formatDelta1A, formatDelta2A, enableComp1, enableComp2,
+      comp1Label, comp2Label, showDelta1, showDelta2, detailDataRaw]);
+  const viewB = useMemo(() => processView(
     recomputeFromRaw('SUM' as const, formatValueB, modeBView, deltaFormat1B, deltaFormat2B) ?? modeBView,
     colorScheme1B, colorScheme2B, formatDelta1B, formatDelta2B,
-  );
+  ), [modeBView, colorScheme1B, colorScheme2B, deltaFormat1B, deltaFormat2B,
+      formatValueB, formatDelta1B, formatDelta2B, enableComp1, enableComp2,
+      comp1Label, comp2Label, showDelta1, showDelta2, detailDataRaw]);
 
   // Detail modal only available when active mode has data
   const activeView = isA ? viewA : viewB;
@@ -567,7 +655,10 @@ export default function KpiCard({
                 active={isA}
                 role="tab"
                 aria-selected={isA}
-                onClick={e => { e.stopPropagation(); setActiveMode('a'); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  setActiveMode('a');
+                }}
               >
                 {toggleLabelA}
               </ToggleButton>
@@ -575,7 +666,10 @@ export default function KpiCard({
                 active={!isA}
                 role="tab"
                 aria-selected={!isA}
-                onClick={e => { e.stopPropagation(); setActiveMode('b'); }}
+                onClick={e => {
+                  e.stopPropagation();
+                  setActiveMode('b');
+                }}
               >
                 {toggleLabelB}
               </ToggleButton>
@@ -609,7 +703,7 @@ export default function KpiCard({
         </DataContainer>
       </Card>
 
-      {hasDetail && detailDataRaw && (
+      {hasDetail && detailDataRaw && isModalOpen && (
         <DetailModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
@@ -647,4 +741,10 @@ export default function KpiCard({
       )}
     </KpiCardRoot>
   );
-}
+}, arePropsEqual);
+
+// Superset expects a plain FunctionComponent, not MemoExoticComponent.
+// Cast through any to bypass React types version mismatch.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const KpiCard = KpiCardMemo as any as (props: KpiCardProps) => JSX.Element;
+export default KpiCard;

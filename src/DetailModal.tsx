@@ -306,11 +306,20 @@ export default function DetailModal({
   const delta1Header = colDelta1;
   const delta2Header = colDelta2;
 
+  /* ── Deferred data loading: show modal instantly with skeleton ── */
+  const [dataReady, setDataReady] = useState(false);
+  useEffect(() => {
+    // Defer heavy aggregation to next frame so modal shell appears instantly
+    setDataReady(false);
+    const raf = requestAnimationFrame(() => setDataReady(true));
+    return () => cancelAnimationFrame(raf);
+  }, [detailDataRaw, isPrimary, aggregationType]);
+
   /* ── Aggregate raw data on hierarchy/mode change (Req #11) ── */
 
   const aggregatedData = useMemo(
     () =>
-      aggregateDetailData({
+      !dataReady ? [] : aggregateDetailData({
         rows: detailDataRaw.rows,
         groupByField: isPrimary ? 'primaryGroup' : 'secondaryGroup',
         childField: isPrimary ? 'secondaryGroup' : 'primaryGroup',
@@ -593,8 +602,26 @@ export default function DetailModal({
           <ResultsCount>{groupLabel}: {groupCount}</ResultsCount>
         </ModalToolbar>
 
+        {/* ── Loading skeleton while aggregating ── */}
+        {!dataReady && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', padding: '48px 0', gap: '12px',
+          }}>
+            <div style={{
+              width: '32px', height: '32px', border: '3px solid var(--g200, #e5e5e5)',
+              borderTopColor: 'var(--c-sky, #3B8BD9)', borderRadius: '50%',
+              animation: 'spin 0.8s linear infinite',
+            }} />
+            <span style={{ color: 'var(--g500, #737373)', fontSize: '13px' }}>
+              Загрузка данных…
+            </span>
+            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+          </div>
+        )}
+
         {/* ── Table — dynamic columns ── */}
-        <TableWrap>
+        {dataReady && <TableWrap>
           <DetailTable>
             <THead>
               <THRow>
@@ -662,10 +689,10 @@ export default function DetailModal({
               )}
             </tbody>
           </DetailTable>
-        </TableWrap>
+        </TableWrap>}
 
         {/* ── Pagination ── */}
-        {totalPages > 1 && (
+        {dataReady && totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 0', fontSize: 13, color: '#666' }}>
             <button
               type="button"

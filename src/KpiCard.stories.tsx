@@ -219,19 +219,19 @@ const CONVERSION_B: KpiViewData = {
 
 const RAW_DETAIL_ROWS: RawDetailRow[] = [
   // Segment: Продукты питания
-  { primaryGroup: 'Продукты питания', secondaryGroup: '№12 Центральный', metricValue: 892_000_000, comp1Value: 840_000_000, comp2Value: 780_000_000 },
-  { primaryGroup: 'Продукты питания', secondaryGroup: '№5 Северный', metricValue: 756_000_000, comp1Value: 710_000_000, comp2Value: 690_000_000 },
-  { primaryGroup: 'Продукты питания', secondaryGroup: '№31 Южный', metricValue: 644_000_000, comp1Value: 680_000_000, comp2Value: 610_000_000 },
+  { primaryGroup: 'Продукты питания', secondaryGroup: '№12 Центральный', metricValue: 892_000_000, comp1Value: 840_000_000, comp2Value: 780_000_000, delta1Value: null, delta2Value: null },
+  { primaryGroup: 'Продукты питания', secondaryGroup: '№5 Северный', metricValue: 756_000_000, comp1Value: 710_000_000, comp2Value: 690_000_000, delta1Value: null, delta2Value: null },
+  { primaryGroup: 'Продукты питания', secondaryGroup: '№31 Южный', metricValue: 644_000_000, comp1Value: 680_000_000, comp2Value: 610_000_000, delta1Value: null, delta2Value: null },
   // Segment: Бытовая химия
-  { primaryGroup: 'Бытовая химия', secondaryGroup: '№12 Центральный', metricValue: 412_000_000, comp1Value: 390_000_000, comp2Value: 370_000_000 },
-  { primaryGroup: 'Бытовая химия', secondaryGroup: '№8 Восточный', metricValue: 358_000_000, comp1Value: 370_000_000, comp2Value: 340_000_000 },
+  { primaryGroup: 'Бытовая химия', secondaryGroup: '№12 Центральный', metricValue: 412_000_000, comp1Value: 390_000_000, comp2Value: 370_000_000, delta1Value: null, delta2Value: null },
+  { primaryGroup: 'Бытовая химия', secondaryGroup: '№8 Восточный', metricValue: 358_000_000, comp1Value: 370_000_000, comp2Value: 340_000_000, delta1Value: null, delta2Value: null },
   // Segment: Алкоголь
-  { primaryGroup: 'Алкоголь', secondaryGroup: '№5 Северный', metricValue: 298_000_000, comp1Value: 310_000_000, comp2Value: 280_000_000 },
-  { primaryGroup: 'Алкоголь', secondaryGroup: '№22 Западный', metricValue: 245_000_000, comp1Value: 280_000_000, comp2Value: 260_000_000 },
+  { primaryGroup: 'Алкоголь', secondaryGroup: '№5 Северный', metricValue: 298_000_000, comp1Value: 310_000_000, comp2Value: 280_000_000, delta1Value: null, delta2Value: null },
+  { primaryGroup: 'Алкоголь', secondaryGroup: '№22 Западный', metricValue: 245_000_000, comp1Value: 280_000_000, comp2Value: 260_000_000, delta1Value: null, delta2Value: null },
   // Segment: Кондитерские изделия
-  { primaryGroup: 'Кондитерские изделия', secondaryGroup: '№12 Центральный', metricValue: 342_000_000, comp1Value: 300_000_000, comp2Value: 290_000_000 },
+  { primaryGroup: 'Кондитерские изделия', secondaryGroup: '№12 Центральный', metricValue: 342_000_000, comp1Value: 300_000_000, comp2Value: 290_000_000, delta1Value: null, delta2Value: null },
   // Segment: Товары для дома
-  { primaryGroup: 'Товары для дома', secondaryGroup: '№31 Южный', metricValue: 210_000_000, comp1Value: 200_000_000, comp2Value: 195_000_000 },
+  { primaryGroup: 'Товары для дома', secondaryGroup: '№31 Южный', metricValue: 210_000_000, comp1Value: 200_000_000, comp2Value: 195_000_000, delta1Value: null, delta2Value: null },
 ];
 
 const MOCK_DETAIL_RAW: DetailDataRaw = { rows: RAW_DETAIL_ROWS };
