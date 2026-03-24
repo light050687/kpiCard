@@ -245,7 +245,7 @@ interface DetailModalProps {
 
 /* ── Main component ── */
 
-export default function DetailModal({
+function DetailModalInner({
   isOpen,
   onClose,
   title,
@@ -306,47 +306,36 @@ export default function DetailModal({
   const delta1Header = colDelta1;
   const delta2Header = colDelta2;
 
-  /* ── Deferred data loading: show modal instantly with skeleton ── */
-  const [dataReady, setDataReady] = useState(false);
-  useEffect(() => {
-    // Defer heavy aggregation to next frame so modal shell appears instantly
-    setDataReady(false);
-    const raf = requestAnimationFrame(() => setDataReady(true));
-    return () => cancelAnimationFrame(raf);
-  }, [detailDataRaw, isPrimary, aggregationType]);
-
-  /* ── Aggregate raw data on hierarchy/mode change (Req #11) ── */
+  /* ── Synchronous aggregation via useMemo (modal is pre-rendered in DOM) ── */
 
   const aggregatedData = useMemo(
-    () =>
-      !dataReady ? [] : aggregateDetailData({
-        rows: detailDataRaw.rows,
-        groupByField: isPrimary ? 'primaryGroup' : 'secondaryGroup',
-        childField: isPrimary ? 'secondaryGroup' : 'primaryGroup',
-        aggregationType,
-        topN,
-        formatValue,
-        formatDelta,
-        colorScheme1,
-        colorScheme2,
-        enableComp1,
-        enableComp2,
-        deltaFormat1,
-        deltaFormat2,
-        fmtComp1,
-        fmtComp2,
-        fmtDelta1,
-        fmtDelta2,
-        showDelta1,
-        showDelta2,
-      }),
-    [
-      detailDataRaw, isPrimary, aggregationType, topN,
-      formatValue, formatDelta, colorScheme1, colorScheme2,
-      enableComp1, enableComp2, deltaFormat1, deltaFormat2,
-      fmtComp1, fmtComp2, fmtDelta1, fmtDelta2, showDelta1, showDelta2,
-    ],
+    () => aggregateDetailData({
+      rows: detailDataRaw.rows,
+      groupByField: isPrimary ? 'primaryGroup' : 'secondaryGroup',
+      childField: isPrimary ? 'secondaryGroup' : 'primaryGroup',
+      aggregationType,
+      topN,
+      formatValue,
+      formatDelta,
+      colorScheme1,
+      colorScheme2,
+      enableComp1,
+      enableComp2,
+      deltaFormat1,
+      deltaFormat2,
+      fmtComp1,
+      fmtComp2,
+      fmtDelta1,
+      fmtDelta2,
+      showDelta1,
+      showDelta2,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- function refs change on every render but produce same output
+    [detailDataRaw, isPrimary, aggregationType, topN,
+     colorScheme1, colorScheme2, enableComp1, enableComp2,
+     deltaFormat1, deltaFormat2, showDelta1, showDelta2],
   );
+  const isLoading = false;
 
   /* ── Search filtering (by scope: group or child) ── */
 
@@ -532,10 +521,12 @@ export default function DetailModal({
 
   /* ── Render guard ── */
 
-  if (!isOpen && !isClosing) return null;
+  // Always keep modal in DOM — hidden via CSS when closed.
+  // This eliminates React mount delay when opening.
+  const isHidden = !isOpen && !isClosing;
 
   return (
-    <Overlay closing={isClosing} onClick={handleOverlayClick}>
+    <Overlay closing={isClosing} onClick={handleOverlayClick} style={isHidden ? { visibility: 'hidden', pointerEvents: 'none', opacity: 0 } : undefined}>
       <Modal
         ref={modalRef}
         closing={isClosing}
@@ -602,26 +593,8 @@ export default function DetailModal({
           <ResultsCount>{groupLabel}: {groupCount}</ResultsCount>
         </ModalToolbar>
 
-        {/* ── Loading skeleton while aggregating ── */}
-        {!dataReady && (
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', padding: '48px 0', gap: '12px',
-          }}>
-            <div style={{
-              width: '32px', height: '32px', border: '3px solid var(--g200, #e5e5e5)',
-              borderTopColor: 'var(--c-sky, #3B8BD9)', borderRadius: '50%',
-              animation: 'spin 0.8s linear infinite',
-            }} />
-            <span style={{ color: 'var(--g500, #737373)', fontSize: '13px' }}>
-              Загрузка данных…
-            </span>
-            <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
-          </div>
-        )}
-
         {/* ── Table — dynamic columns ── */}
-        {dataReady && <TableWrap>
+        <TableWrap>
           <DetailTable>
             <THead>
               <THRow>
@@ -654,7 +627,23 @@ export default function DetailModal({
               </THRow>
             </THead>
             <tbody>
-              {filteredData.length === 0 ? (
+              {isLoading ? (
+                <EmptyRow>
+                  <td colSpan={colCount}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                      <span style={{
+                        display: 'inline-block', width: 16, height: 16,
+                        border: '2px solid var(--g200, #e5e5e5)',
+                        borderTopColor: 'var(--c-sky, #3B8BD9)',
+                        borderRadius: '50%',
+                        animation: 'kpi-spin 0.7s linear infinite',
+                      }} />
+                      Загрузка…
+                    </div>
+                    <style>{`@keyframes kpi-spin{to{transform:rotate(360deg)}}`}</style>
+                  </td>
+                </EmptyRow>
+              ) : filteredData.length === 0 ? (
                 <EmptyRow>
                   <td colSpan={colCount}>Ничего не найдено</td>
                 </EmptyRow>
@@ -689,10 +678,10 @@ export default function DetailModal({
               )}
             </tbody>
           </DetailTable>
-        </TableWrap>}
+        </TableWrap>
 
         {/* ── Pagination ── */}
-        {dataReady && totalPages > 1 && (
+        {totalPages > 1 && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 0', fontSize: 13, color: '#666' }}>
             <button
               type="button"
@@ -738,3 +727,16 @@ export default function DetailModal({
     </Overlay>
   );
 }
+
+// React.memo: skip re-renders when only function props changed (toggle Mode A/B)
+function areDetailPropsEqual(prev: DetailModalProps, next: DetailModalProps): boolean {
+  const keys = Object.keys(next) as (keyof DetailModalProps)[];
+  for (const key of keys) {
+    if (typeof next[key] === 'function') continue;
+    if (prev[key] !== next[key]) return false;
+  }
+  return true;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export default React.memo(DetailModalInner, areDetailPropsEqual) as any as typeof DetailModalInner;

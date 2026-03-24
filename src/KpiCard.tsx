@@ -703,7 +703,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
         </DataContainer>
       </Card>
 
-      {hasDetail && detailDataRaw && isModalOpen && (
+      {hasDetail && detailDataRaw && (
         <DetailModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}

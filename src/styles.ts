@@ -440,8 +440,7 @@ export const Overlay = styled.div<{ closing?: boolean }>`
   align-items: center;
   justify-content: center;
   opacity: ${({ closing }) => (closing ? 0 : 1)};
-  transition: opacity 0.25s ${EASE};
-  animation: kpi-overlay-in 0.25s ${EASE} both;
+  transition: opacity 0.3s ${EASE};
 `;
 
 /** Modal container — responsive with min/max constraints and scroll */
@@ -458,10 +457,9 @@ export const Modal = styled.div<{ closing?: boolean }>`
   flex-direction: column;
   overflow: hidden;
   transform: ${({ closing }) =>
-    closing ? 'translateY(12px) scale(.97)' : 'translateY(0) scale(1)'};
+    closing ? 'translateY(8px) scale(.98)' : 'translateY(0) scale(1)'};
   opacity: ${({ closing }) => (closing ? 0 : 1)};
   transition: transform 0.3s ${EASE}, opacity 0.3s ${EASE};
-  animation: kpi-modal-in 0.3s ${EASE} both;
 
   /* Desktop small */
   @media (max-width: 1024px) {
