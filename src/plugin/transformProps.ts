@@ -16,6 +16,7 @@ import {
   ComparisonColorScheme,
   DetailDataRaw,
   RawDetailRow,
+  DetailQueryParams,
 } from '../types';
 import {
   formatRussianSmart,
@@ -182,7 +183,7 @@ function resolveMetricValue(
 // Detail data extraction
 // ═══════════════════════════════════════
 
-function extractDetailRows(
+export function extractDetailRows(
   rows: Record<string, unknown>[],
   primaryCol: string | undefined,
   secondaryCol: string | undefined,
@@ -361,23 +362,52 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
       })
     : { value: '', subtitle: '', comparisons: [] };
 
-  // ── Detail data (Query 1, if present) — uses Mode A metrics ──
-  let detailDataRaw: DetailDataRaw | undefined;
-  if (queriesData && queriesData.length > 1 && queriesData[1]?.data) {
-    const detailRows = queriesData[1].data as Record<string, unknown>[];
-    if (detailRows.length > 0) {
-      detailDataRaw = extractDetailRows(
-        detailRows,
-        formData.groupbyPrimary,
-        formData.groupbySecondary,
+  // ── Detail query params (for lazy loading via SupersetClient) ──
+  const hasGroupby = Boolean(formData.groupbyPrimary);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ds = (chartProps as any).datasource;
+  const dsId = ds?.id ?? (chartProps as any).datasourceId ?? 0;
+  const dsType = ds?.type ?? 'table';
+
+  // Collect all non-null metrics for each mode
+  const collectMetrics = (metrics: (QueryFormMetric | undefined)[]): QueryFormMetric[] =>
+    metrics.filter((m): m is QueryFormMetric => m != null);
+
+  const metricsA = collectMetrics([
+    formData.metricA, formData.metricPlanA, formData.metricComp2A,
+    formData.metricDelta1A, formData.metricDelta2A,
+  ]);
+  const metricsB = hasModeB
+    ? collectMetrics([formData.metricB, formData.metricPlanB, formData.metricComp2B,
+        formData.metricDelta1B, formData.metricDelta2B])
+    : [];
+
+  const detailQueryParams: DetailQueryParams | undefined = hasGroupby
+    ? {
+        datasourceId: dsId,
+        datasourceType: dsType,
+        groupbyPrimary: formData.groupbyPrimary,
+        groupbySecondary: formData.groupbySecondary,
+        metricsA,
+        metricsB,
+        metricLabelsA: metricsA.map(m => getMetricLabel(m)),
+        metricLabelsB: metricsB.map(m => getMetricLabel(m)),
+        timeRange: formData.time_range as string | undefined,
+        granularity: formData.granularity_sqla as string | undefined,
+        filters: (formData.adhoc_filters as unknown[]) ?? [],
+        extras: (formData.extras as Record<string, unknown>) ?? {},
         metricALabel,
-        comp1A.label,
-        comp2A.label,
-        delta1ALabel,
-        delta2ALabel,
-      );
-    }
-  }
+        metricBLabel,
+        comp1LabelA: comp1A.label,
+        comp2LabelA: comp2A.label,
+        delta1LabelA: delta1ALabel,
+        delta2LabelA: delta2ALabel,
+        comp1LabelB: comp1B.label,
+        comp2LabelB: comp2B.label,
+        delta1LabelB: delta1BLabel,
+        delta2LabelB: delta2BLabel,
+      }
+    : undefined;
 
   // ── Detect dark mode (mirrors @superset-ui/core isThemeDark via colorBgContainer) ──
   const isDarkMode = (() => {
@@ -466,7 +496,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     theme,
 
     // Detail
-    detailDataRaw,
+    detailQueryParams,
 
     // Formatters
     formatValueA,

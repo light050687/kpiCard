@@ -178,6 +178,38 @@ export interface DetailDataRaw {
   rows: RawDetailRow[];
 }
 
+/** Parameters for lazy-loading detail data via SupersetClient */
+export interface DetailQueryParams {
+  datasourceId: number;
+  datasourceType: string;
+  groupbyPrimary?: string;
+  groupbySecondary?: string;
+  /** All metric labels for Mode A (main + comp1 + comp2 + delta1 + delta2) */
+  metricLabelsA: string[];
+  /** All metric labels for Mode B */
+  metricLabelsB: string[];
+  /** Raw metrics for Mode A (QueryFormMetric objects for API payload) */
+  metricsA: QueryFormMetric[];
+  /** Raw metrics for Mode B */
+  metricsB: QueryFormMetric[];
+  timeRange?: string;
+  granularity?: string;
+  /** Superset filters (native + extra) */
+  filters: unknown[];
+  extras: Record<string, unknown>;
+  /** Comp/delta metric labels for extractDetailRows */
+  comp1LabelA: string | null;
+  comp2LabelA: string | null;
+  delta1LabelA: string | null;
+  delta2LabelA: string | null;
+  comp1LabelB: string | null;
+  comp2LabelB: string | null;
+  delta1LabelB: string | null;
+  delta2LabelB: string | null;
+  metricALabel: string;
+  metricBLabel: string;
+}
+
 /** Single formatted row in the detail drill-down table */
 export interface DetailRow {
   name: string;
@@ -277,7 +309,8 @@ export interface KpiCardProps {
   theme: typeof supersetTheme;
 
   // ── Detail data (raw rows for on-the-fly aggregation) ──
-  detailDataRaw?: DetailDataRaw;
+  /** Parameters for lazy-loading detail data via SupersetClient */
+  detailQueryParams?: DetailQueryParams;
 
   // ── Formatting functions ──
   formatValueA: (n: number) => string;

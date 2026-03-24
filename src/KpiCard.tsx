@@ -5,13 +5,7 @@ import {
   ComparisonItem as CmpItem,
   ComparisonColorScheme,
   DeltaStatus,
-  DeltaFormat,
-  AggregationType,
 } from './types';
-import {
-  formatRussianPercent,
-  formatDeltaByFormat,
-} from './utils/formatRussian';
 import {
   CARD_CLASS,
   KEYFRAMES_CSS,
@@ -233,7 +227,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   hierarchyLabelPrimary,
   hierarchyLabelSecondary,
   isDarkMode,
-  detailDataRaw,
+  detailQueryParams,
   // aggregationType removed — always SUM-based logic
   formatValueA,
   formatValueB,
@@ -381,17 +375,19 @@ const KpiCardMemo = React.memo(function KpiCardInner({
           }
           dotsBtn.style.cssText += ';visibility:visible!important;pointer-events:auto!important;';
 
-          // Show dots only on card hover (with proper cleanup)
+          // Show dots on hover — listen on chart-slice (parent of both header and card)
+          // so mouse moving from card to dots doesn't trigger mouseleave
+          const hoverTarget = chartSlice || el;
           const target = controlsDiv || dotsBtn;
           const onEnter = () => { target.style.opacity = '1'; };
           const onLeave = () => { target.style.opacity = '0'; };
-          el.addEventListener('mouseenter', onEnter);
-          el.addEventListener('mouseleave', onLeave);
+          hoverTarget.addEventListener('mouseenter', onEnter);
+          hoverTarget.addEventListener('mouseleave', onLeave);
 
           // Store cleanup refs
           (el as any).__kpiDotsCleanup = () => {
-            el.removeEventListener('mouseenter', onEnter);
-            el.removeEventListener('mouseleave', onLeave);
+            hoverTarget.removeEventListener('mouseenter', onEnter);
+            hoverTarget.removeEventListener('mouseleave', onLeave);
           };
         }
       }
@@ -453,119 +449,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
     );
   }
 
-  const rawRows = detailDataRaw?.rows;
-
-  // Resolve 'auto' delta format by aggregationType
-  const resolveAutoFmt = (fmt: DeltaFormat, aggType: AggregationType): string =>
-    fmt === 'auto'
-      ? aggType === 'PERCENT'
-        ? 'pp'
-        : aggType === 'SUM'
-          ? 'absolute'
-          : 'percent'
-      : fmt;
-
-  // Recompute hero + comparisons from raw data when aggregation != SUM
-  const recomputeFromRaw = (
-    aggType: AggregationType,
-    fmtValue: (n: number) => string,
-    baseView: KpiViewData,
-    deltaFmt1: DeltaFormat,
-    deltaFmt2: DeltaFormat,
-  ): KpiViewData | null => {
-    if (aggType === 'SUM' || !rawRows?.length) return null;
-
-    // Group by primaryGroup for aggregation
-    const groups = new Map<string, { metric: number; comp1: number; comp2: number }>();
-    for (const r of rawRows) {
-      const existing = groups.get(r.primaryGroup);
-      if (existing) {
-        existing.metric += r.metricValue;
-        existing.comp1 += r.comp1Value ?? 0;
-        existing.comp2 += r.comp2Value ?? 0;
-      } else {
-        groups.set(r.primaryGroup, {
-          metric: r.metricValue,
-          comp1: r.comp1Value ?? 0,
-          comp2: r.comp2Value ?? 0,
-        });
-      }
-    }
-
-    const total = rawRows.reduce((s, r) => s + r.metricValue, 0);
-    const totalComp1 = rawRows.reduce((s, r) => s + (r.comp1Value ?? 0), 0);
-    const totalComp2 = rawRows.reduce((s, r) => s + (r.comp2Value ?? 0), 0);
-    const hasComp1 = rawRows.some(r => r.comp1Value != null);
-    const hasComp2 = rawRows.some(r => r.comp2Value != null);
-
-    const vals = [...groups.values()];
-    let heroNum: number;
-    let comp1Num: number;
-    let comp2Num: number;
-
-    switch (aggType) {
-      case 'AVERAGE':
-        heroNum = total / groups.size;
-        comp1Num = totalComp1 / groups.size;
-        comp2Num = totalComp2 / groups.size;
-        break;
-      case 'MAX':
-        heroNum = Math.max(...vals.map(v => v.metric));
-        comp1Num = Math.max(...vals.map(v => v.comp1));
-        comp2Num = Math.max(...vals.map(v => v.comp2));
-        break;
-      case 'MIN':
-        heroNum = Math.min(...vals.map(v => v.metric));
-        comp1Num = Math.min(...vals.map(v => v.comp1));
-        comp2Num = Math.min(...vals.map(v => v.comp2));
-        break;
-      case 'PERCENT':
-        heroNum = totalComp1 !== 0 ? total / totalComp1 : 0;
-        comp1Num = 1; // 100% baseline
-        comp2Num = totalComp2 !== 0 ? total / totalComp2 : 0;
-        break;
-      default:
-        return null;
-    }
-
-    const isPercent = aggType === 'PERCENT';
-    const heroStr = isPercent
-      ? formatRussianPercent(heroNum, false)
-      : fmtValue(heroNum);
-
-    // Rebuild comparisons from aggregated values
-    const comparisons: CmpItem[] = [];
-
-    if (hasComp1) {
-      const d = heroNum - comp1Num;
-      const status: DeltaStatus = d > 0 ? 'up' : d < 0 ? 'dn' : 'neutral';
-      comparisons.push({
-        label: comp1Label,
-        value: isPercent ? formatRussianPercent(comp1Num, false) : fmtValue(comp1Num),
-        delta: formatDeltaByFormat(d, comp1Num, resolveAutoFmt(deltaFmt1, aggType), isPercent),
-        status,
-        type: 'comp1',
-        rawDiff: d,
-        rawRef: comp1Num,
-      });
-    }
-
-    if (hasComp2) {
-      const d = heroNum - comp2Num;
-      const status: DeltaStatus = d > 0 ? 'up' : d < 0 ? 'dn' : 'neutral';
-      comparisons.push({
-        label: comp2Label,
-        value: isPercent ? formatRussianPercent(comp2Num, false) : fmtValue(comp2Num),
-        delta: formatDeltaByFormat(d, comp2Num, resolveAutoFmt(deltaFmt2, aggType), isPercent),
-        status,
-        type: 'comp2',
-        rawDiff: d,
-        rawRef: comp2Num,
-      });
-    }
-
-    return { value: heroStr, subtitle: baseView.subtitle, comparisons };
-  };
+  const hasGroupby = Boolean(detailQueryParams?.groupbyPrimary);
 
   // Filter comparisons, override labels, apply colorScheme inversion
   const processView = (
@@ -611,22 +495,22 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   });
 
   const viewA = useMemo(() => processView(
-    recomputeFromRaw('SUM' as const, formatValueA, modeAView, deltaFormat1A, deltaFormat2A) ?? modeAView,
+    modeAView,
     colorScheme1A, colorScheme2A, formatDelta1A, formatDelta2A,
   ), [modeAView, colorScheme1A, colorScheme2A, deltaFormat1A, deltaFormat2A,
       formatValueA, formatDelta1A, formatDelta2A, enableComp1, enableComp2,
-      comp1Label, comp2Label, showDelta1, showDelta2, detailDataRaw]);
+      comp1Label, comp2Label, showDelta1, showDelta2]);
   const viewB = useMemo(() => processView(
-    recomputeFromRaw('SUM' as const, formatValueB, modeBView, deltaFormat1B, deltaFormat2B) ?? modeBView,
+    modeBView,
     colorScheme1B, colorScheme2B, formatDelta1B, formatDelta2B,
   ), [modeBView, colorScheme1B, colorScheme2B, deltaFormat1B, deltaFormat2B,
       formatValueB, formatDelta1B, formatDelta2B, enableComp1, enableComp2,
-      comp1Label, comp2Label, showDelta1, showDelta2, detailDataRaw]);
+      comp1Label, comp2Label, showDelta1, showDelta2]);
 
   // Detail modal only available when active mode has data
   const activeView = isA ? viewA : viewB;
   const activeModeEmpty = activeView.value === '' && activeView.comparisons.length === 0;
-  const hasDetail = Boolean(rawRows?.length) && !activeModeEmpty;
+  const hasDetail = hasGroupby && !activeModeEmpty;
 
   return (
     <KpiCardRoot
@@ -703,14 +587,15 @@ const KpiCardMemo = React.memo(function KpiCardInner({
         </DataContainer>
       </Card>
 
-      {hasDetail && detailDataRaw && (
+      {hasDetail && detailQueryParams && (
         <DetailModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           title={headerText}
           headerValue={isA ? viewA.value : viewB.value}
-          detailDataRaw={detailDataRaw}
-          aggregationType={isA ? 'SUM' as const : 'SUM' as const}
+          queryParams={detailQueryParams}
+          activeMode={activeMode}
+          aggregationType={'SUM' as const}
           colorScheme1={isA ? colorScheme1A : colorScheme1B}
           colorScheme2={isA ? colorScheme2A : colorScheme2B}
           deltaFormat1={isA ? deltaFormat1A : deltaFormat1B}

@@ -5,8 +5,10 @@ import React, {
   useRef,
   useMemo,
 } from 'react';
+import { SupersetClient } from '@superset-ui/core';
 import {
   DetailDataRaw,
+  DetailQueryParams,
   DeltaFormat,
   DetailGroup,
   DetailRow,
@@ -15,6 +17,7 @@ import {
   ComparisonColorScheme,
 } from './types';
 import { aggregateDetailData } from './utils/aggregation';
+import { extractDetailRows } from './plugin/transformProps';
 import {
   Overlay,
   Modal,
@@ -213,7 +216,8 @@ interface DetailModalProps {
   onClose: () => void;
   title: string;
   headerValue: string;
-  detailDataRaw: DetailDataRaw;
+  queryParams: DetailQueryParams;
+  activeMode: 'a' | 'b';
   aggregationType: AggregationType;
   colorScheme1: ComparisonColorScheme;
   colorScheme2: ComparisonColorScheme;
@@ -250,7 +254,8 @@ function DetailModalInner({
   onClose,
   title,
   headerValue,
-  detailDataRaw,
+  queryParams,
+  activeMode,
   aggregationType,
   colorScheme1,
   colorScheme2,
@@ -306,36 +311,122 @@ function DetailModalInner({
   const delta1Header = colDelta1;
   const delta2Header = colDelta2;
 
-  /* ── Synchronous aggregation via useMemo (modal is pre-rendered in DOM) ── */
+  /* ── Lazy fetch detail data via SupersetClient ── */
 
-  const aggregatedData = useMemo(
-    () => aggregateDetailData({
+  const [detailDataRaw, setDetailDataRaw] = useState<DetailDataRaw | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Fetch on open or mode change
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Abort previous request
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setIsLoading(true);
+    setFetchError(null);
+
+    const isA = activeMode === 'a';
+    const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
+    const groupby = [queryParams.groupbyPrimary, queryParams.groupbySecondary]
+      .filter((c): c is string => typeof c === 'string' && c.length > 0);
+
+    if (metrics.length === 0 || groupby.length === 0) {
+      setDetailDataRaw({ rows: [] });
+      setIsLoading(false);
+      return;
+    }
+
+    const payload = {
+      datasource: { id: queryParams.datasourceId, type: queryParams.datasourceType },
+      queries: [{
+        columns: groupby,
+        metrics,
+        time_range: queryParams.timeRange || 'No filter',
+        granularity: queryParams.granularity,
+        filters: queryParams.filters,
+        extras: queryParams.extras,
+        row_limit: 10000,
+        orderby: [],
+        post_processing: [],
+      }],
+      result_format: 'json',
+      result_type: 'full',
+    };
+
+    SupersetClient.post({
+      endpoint: 'api/v1/chart/data',
+      jsonPayload: payload,
+      signal: controller.signal,
+    })
+      .then(({ json }: { json: Record<string, unknown> }) => {
+        const resultArr = json.result as Array<{ data: Record<string, unknown>[] }>;
+        const rows = resultArr?.[0]?.data ?? [];
+        const metricLabel = isA ? queryParams.metricALabel : queryParams.metricBLabel;
+        const comp1Label_ = isA ? queryParams.comp1LabelA : queryParams.comp1LabelB;
+        const comp2Label_ = isA ? queryParams.comp2LabelA : queryParams.comp2LabelB;
+        const delta1Label_ = isA ? queryParams.delta1LabelA : queryParams.delta1LabelB;
+        const delta2Label_ = isA ? queryParams.delta2LabelA : queryParams.delta2LabelB;
+
+        const detailData = extractDetailRows(
+          rows,
+          queryParams.groupbyPrimary,
+          queryParams.groupbySecondary,
+          metricLabel,
+          comp1Label_,
+          comp2Label_,
+          delta1Label_,
+          delta2Label_,
+        );
+        setDetailDataRaw(detailData);
+        setIsLoading(false);
+      })
+      .catch((err: Error) => {
+        if (err.name !== 'AbortError') {
+          setFetchError('Ошибка загрузки данных');
+          setIsLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, activeMode, queryParams.datasourceId]);
+
+  /* ── Aggregate data into both hierarchy variants for instant swap ── */
+
+  const aggregatedPrimary = useMemo(() => {
+    if (!detailDataRaw?.rows?.length) return [];
+    return aggregateDetailData({
       rows: detailDataRaw.rows,
-      groupByField: isPrimary ? 'primaryGroup' : 'secondaryGroup',
-      childField: isPrimary ? 'secondaryGroup' : 'primaryGroup',
-      aggregationType,
-      topN,
-      formatValue,
-      formatDelta,
-      colorScheme1,
-      colorScheme2,
-      enableComp1,
-      enableComp2,
-      deltaFormat1,
-      deltaFormat2,
-      fmtComp1,
-      fmtComp2,
-      fmtDelta1,
-      fmtDelta2,
-      showDelta1,
-      showDelta2,
-    }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- function refs change on every render but produce same output
-    [detailDataRaw, isPrimary, aggregationType, topN,
-     colorScheme1, colorScheme2, enableComp1, enableComp2,
-     deltaFormat1, deltaFormat2, showDelta1, showDelta2],
-  );
-  const isLoading = false;
+      groupByField: 'primaryGroup',
+      childField: 'secondaryGroup',
+      aggregationType, topN, formatValue, formatDelta,
+      colorScheme1, colorScheme2, enableComp1, enableComp2,
+      deltaFormat1, deltaFormat2, fmtComp1, fmtComp2,
+      fmtDelta1, fmtDelta2, showDelta1, showDelta2,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailDataRaw]);
+
+  const aggregatedSecondary = useMemo(() => {
+    if (!detailDataRaw?.rows?.length) return [];
+    return aggregateDetailData({
+      rows: detailDataRaw.rows,
+      groupByField: 'secondaryGroup',
+      childField: 'primaryGroup',
+      aggregationType, topN, formatValue, formatDelta,
+      colorScheme1, colorScheme2, enableComp1, enableComp2,
+      deltaFormat1, deltaFormat2, fmtComp1, fmtComp2,
+      fmtDelta1, fmtDelta2, showDelta1, showDelta2,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detailDataRaw]);
+
+  const aggregatedData = isPrimary ? aggregatedPrimary : aggregatedSecondary;
 
   /* ── Search filtering (by scope: group or child) ── */
 
@@ -643,6 +734,21 @@ function DetailModalInner({
                     <style>{`@keyframes kpi-spin{to{transform:rotate(360deg)}}`}</style>
                   </td>
                 </EmptyRow>
+              ) : fetchError ? (
+                <EmptyRow>
+                  <td colSpan={colCount}>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: 'var(--dn, #DC2626)' }}>
+                      <span>{fetchError}</span>
+                      <button
+                        type="button"
+                        onClick={() => { setFetchError(null); setIsLoading(true); }}
+                        style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--g300)', background: 'var(--s)', cursor: 'pointer', fontSize: 12 }}
+                      >
+                        Повторить
+                      </button>
+                    </div>
+                  </td>
+                </EmptyRow>
               ) : filteredData.length === 0 ? (
                 <EmptyRow>
                   <td colSpan={colCount}>Ничего не найдено</td>
@@ -728,8 +834,14 @@ function DetailModalInner({
   );
 }
 
-// React.memo: skip re-renders when only function props changed (toggle Mode A/B)
+// React.memo: block ALL re-renders when modal is closed (toggle perf).
+// When opening: isOpen changes false→true → allows re-render with fresh props.
 function areDetailPropsEqual(prev: DetailModalProps, next: DetailModalProps): boolean {
+  // If modal stays closed → block everything (toggle A/B won't trigger heavy re-render)
+  if (!prev.isOpen && !next.isOpen) return true;
+  // If modal is opening or closing → allow re-render
+  if (prev.isOpen !== next.isOpen) return false;
+  // Modal is open → skip only function props
   const keys = Object.keys(next) as (keyof DetailModalProps)[];
   for (const key of keys) {
     if (typeof next[key] === 'function') continue;

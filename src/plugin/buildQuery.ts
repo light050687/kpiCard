@@ -21,8 +21,6 @@ export default function buildQuery(formData: KpiCardFormData) {
     metric_delta_2a,
     metric_delta_1b,
     metric_delta_2b,
-    groupby_primary,
-    groupby_secondary,
   } = formData;
 
   return buildQueryContext(formData, baseQueryObject => {
@@ -96,24 +94,7 @@ export default function buildQuery(formData: KpiCardFormData) {
       post_processing: [],
     };
 
-    // ── Query 1: Detail breakdown (only if groupby columns are set) ──
-    const detailGroupby = [groupby_primary, groupby_secondary].filter(
-      (col): col is string => typeof col === 'string' && col.length > 0,
-    );
-
-    if (detailGroupby.length === 0) {
-      return [summaryQuery];
-    }
-
-    const detailQuery = {
-      ...baseFields,
-      metrics: allMetrics,
-      columns: detailGroupby,
-      orderby: [],
-      row_limit: 10000,
-      post_processing: [],
-    };
-
-    return [summaryQuery, detailQuery];
+    // Detail data loaded on-demand via SupersetClient when modal opens
+    return [summaryQuery];
   });
 }
