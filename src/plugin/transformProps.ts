@@ -159,16 +159,16 @@ function resolveMetricValue(
   summaryData: Record<string, unknown>[],
   excludeKeys: Set<string>,
 ): { label: string | null; value: number | null } {
+  // If metric is not configured in controlPanel — return null, NO fallback
+  if (!formDataMetric) return { label: null, value: null };
   if (!summaryData.length) return { label: null, value: null };
 
-  // Strategy 1: direct label
-  if (formDataMetric) {
-    const label = getMetricLabel(formDataMetric);
-    const value = extractMetricValue(summaryData, label);
-    if (value != null) return { label, value };
-  }
+  // Strategy 1: direct label lookup
+  const label = getMetricLabel(formDataMetric);
+  const value = extractMetricValue(summaryData, label);
+  if (value != null) return { label, value };
 
-  // Strategy 2: next unused key in results
+  // Strategy 2: fallback to next unused key (backward compat for renamed metrics)
   const row = summaryData[0];
   const nextKey = Object.keys(row).find(k => !excludeKeys.has(k));
   if (nextKey) {
@@ -304,11 +304,13 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const metricBLabel = hasModeB ? getMetricLabel(formData.metricB!) : '';
   const mainValueB = metricBLabel ? (extractMetricValue(summaryData, metricBLabel) ?? 0) : 0;
 
+  const usedKeysB = new Set<string>([metricBLabel].filter(Boolean));
   const comp1B = hasModeB
-    ? (() => { const keys = new Set<string>([metricBLabel].filter(Boolean)); return resolveMetricValue(formData.metricPlanB, summaryData, keys); })()
+    ? resolveMetricValue(formData.metricPlanB, summaryData, usedKeysB)
     : { label: null, value: null };
+  if (comp1B.label) usedKeysB.add(comp1B.label);
   const comp2B = hasModeB
-    ? (() => { const keys = new Set<string>([metricBLabel, comp1B.label].filter(Boolean) as string[]); return resolveMetricValue(formData.metricComp2B, summaryData, keys); })()
+    ? resolveMetricValue(formData.metricComp2B, summaryData, usedKeysB)
     : { label: null, value: null };
 
   // ── Delta metrics Mode B ──
