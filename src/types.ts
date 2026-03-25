@@ -226,6 +226,12 @@ export interface DetailRow {
   comp2Value?: string;
   comp2Delta?: string;
   comp2Status?: DeltaStatus;
+  /** Raw numeric values for CSV export (no formatting) */
+  rawValue?: number;
+  rawComp1?: number;
+  rawComp1Delta?: number;
+  rawComp2?: number;
+  rawComp2Delta?: number;
 }
 
 /** Expandable group with aggregated summary and child rows */

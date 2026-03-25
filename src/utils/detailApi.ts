@@ -227,6 +227,8 @@ interface ChildrenPayloadParams {
   parentValue: string;
   childCol: string;
   metricLabel: string;
+  searchQuery?: string;
+  searchScope?: 'group' | 'child';
 }
 
 /**
@@ -238,7 +240,7 @@ export function buildChildrenPayload(
   params: ChildrenPayloadParams,
 ): Record<string, unknown> {
   const { queryParams, activeMode, parentCol, parentValue, childCol,
-    metricLabel } = params;
+    metricLabel, searchQuery, searchScope } = params;
 
   const isA = activeMode === 'a';
   const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
@@ -247,6 +249,12 @@ export function buildChildrenPayload(
     ...queryParams.filters,
     { col: parentCol, op: '==', val: parentValue },
   ];
+
+  // When searching by child scope, also filter children by search query
+  const trimmed = searchQuery?.trim();
+  if (trimmed && searchScope === 'child') {
+    filters.push({ col: childCol, op: 'ILIKE', val: `%${trimmed}%` });
+  }
 
   // HAVING to filter zero-metric children (same as groups)
   const baseExtras = queryParams.extras ?? {};
@@ -430,6 +438,22 @@ export function formatServerRow(
     delta1Raw,
     delta2Raw,
   );
+
+  // Attach raw numeric values for CSV export (no formatting)
+  summary.rawValue = metric;
+  if (comp1 != null) summary.rawComp1 = comp1;
+  if (comp2 != null) summary.rawComp2 = comp2;
+  // Delta: use pre-computed SQL delta if available, otherwise metric - comp
+  if (delta1Raw != null) {
+    summary.rawComp1Delta = delta1Raw;
+  } else if (comp1 != null) {
+    summary.rawComp1Delta = isPercentMode ? metric - comp1 : metric - comp1;
+  }
+  if (delta2Raw != null) {
+    summary.rawComp2Delta = delta2Raw;
+  } else if (comp2 != null) {
+    summary.rawComp2Delta = isPercentMode ? metric - comp2 : metric - comp2;
+  }
 
   return { name, summary, rawMetric };
 }

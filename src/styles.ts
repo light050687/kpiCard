@@ -775,9 +775,15 @@ export const PageInput = styled.input`
   font-family: var(--m);
   font-size: 12px;
   text-align: center;
-  color: var(--g600);
+  color: var(--ink);
   outline: none;
   background: var(--s);
+
+  &::placeholder {
+    color: var(--g400);
+    font-size: 13px;
+    font-weight: 500;
+  }
 
   &:focus {
     border-color: var(--c-sky);

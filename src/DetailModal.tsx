@@ -91,12 +91,15 @@ async function exportToCsv(
     headers.push(delta2Header);
   }
 
+  const rawNum = (v: number | undefined): string =>
+    v != null ? String(v) : '';
+
   const rows: string[][] = [];
   for (const group of data) {
     for (const child of group.children) {
-      const row = [group.name, child.name, child.value];
-      if (enableComp1) row.push(child.comp1Value ?? '', child.comp1Delta ?? '');
-      if (enableComp2) row.push(child.comp2Value ?? '', child.comp2Delta ?? '');
+      const row = [group.name, child.name, rawNum(child.rawValue)];
+      if (enableComp1) row.push(rawNum(child.rawComp1), rawNum(child.rawComp1Delta));
+      if (enableComp2) row.push(rawNum(child.rawComp2), rawNum(child.rawComp2Delta));
       rows.push(row);
     }
   }
@@ -566,6 +569,8 @@ function DetailModalInner({
       parentValue: groupName,
       childCol,
       metricLabel,
+      searchQuery: debouncedSearch,
+      searchScope,
     });
 
     SupersetClient.post({
@@ -1038,7 +1043,7 @@ function DetailModalInner({
         {/* ── Footer ── */}
         <ModalFoot>
           <FooterHint>
-            ▶ раскрыть детализацию&ensp;·&ensp;<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{verticalAlign: 'middle'}}><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></svg> экспорт
+            ▶ раскрыть детализацию&ensp;·&ensp;<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{verticalAlign: 'middle'}}><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></svg> экспорт
           </FooterHint>
           <ExportButton
             onClick={handleExport}
@@ -1047,12 +1052,12 @@ function DetailModalInner({
             disabled={isExporting}
           >
             <svg
-              width="18"
-              height="18"
+              width="14"
+              height="14"
               viewBox="0 0 16 16"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.4"
+              strokeWidth="1"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
