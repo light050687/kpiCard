@@ -721,12 +721,82 @@ export const ResultsCount = styled.span`
   font-variant-numeric: tabular-nums;
 `;
 
+/* ── Pagination ── */
+
+export const PaginationWrap = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 20px;
+  border-top: 1px solid var(--g100);
+  font-family: var(--m);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+`;
+
+export const PageBtn = styled.button<{ isActive?: boolean }>`
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: 6px;
+  font-family: var(--m);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background 0.15s;
+  background: ${({ isActive }) => (isActive ? 'var(--c-sky)' : 'transparent')};
+  color: ${({ isActive }) => (isActive ? '#fff' : 'var(--g600)')};
+
+  &:hover {
+    background: ${({ isActive }) => (isActive ? 'var(--c-sky)' : 'var(--g100)')};
+  }
+  &:focus-visible {
+    outline: 2px solid var(--c-sky);
+    outline-offset: 2px;
+  }
+`;
+
+export const PageEllipsis = styled.span`
+  width: 28px;
+  text-align: center;
+  color: var(--g400);
+  user-select: none;
+`;
+
+export const PageInput = styled.input`
+  width: 50px;
+  height: 28px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border: 1px solid var(--g200);
+  border-radius: 6px;
+  font-family: var(--m);
+  font-size: 12px;
+  text-align: center;
+  color: var(--g600);
+  outline: none;
+  background: var(--s);
+
+  &:focus {
+    border-color: var(--c-sky);
+  }
+  &::-webkit-outer-spin-button,
+  &::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+  -moz-appearance: textfield;
+`;
+
 /** Scrollable table area — both axes scroll when content overflows */
 export const TableWrap = styled.div`
   flex: 1;
   overflow-y: auto;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  position: relative;
 `;
 
 export const DetailTable = styled.table`
@@ -931,12 +1001,13 @@ export const ExportButton = styled.button`
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 8px 14px;
+  padding: 8px 10px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ${EASE};
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 
   &:hover {
@@ -947,5 +1018,31 @@ export const ExportButton = styled.button`
   &:focus-visible {
     outline: 2px solid var(--c-sky);
     outline-offset: 2px;
+  }
+`;
+
+/* ── Refresh progress bar (stale-while-revalidate) ── */
+
+export const RefreshBar = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  overflow: hidden;
+  z-index: 2;
+
+  &::after {
+    content: '';
+    display: block;
+    width: 40%;
+    height: 100%;
+    background: var(--c-sky, #3B8BD9);
+    animation: kpi-refresh-slide 1.2s ease-in-out infinite;
+  }
+
+  @keyframes kpi-refresh-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
   }
 `;

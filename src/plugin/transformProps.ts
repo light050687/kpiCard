@@ -14,8 +14,6 @@ import {
   DeltaStatus,
   DeltaFormat,
   ComparisonColorScheme,
-  DetailDataRaw,
-  RawDetailRow,
   DetailQueryParams,
 } from '../types';
 import {
@@ -55,6 +53,7 @@ function extractMetricValue(
 
 type ValueFormatter = (n: number) => string;
 
+// @ts-ignore TS6133 — kept for potential future use with generic format
 function createValueFormatter(
   formatStr: string | undefined,
   autoRussian: boolean,
@@ -180,31 +179,10 @@ function resolveMetricValue(
 }
 
 // ═══════════════════════════════════════
-// Detail data extraction
+// NOTE: extractDetailRows removed — detail data
+// is now fetched and formatted server-side.
+// See utils/detailApi.ts for formatServerRow().
 // ═══════════════════════════════════════
-
-export function extractDetailRows(
-  rows: Record<string, unknown>[],
-  primaryCol: string | undefined,
-  secondaryCol: string | undefined,
-  metricLabel: string,
-  comp1MetricLabel: string | null,
-  comp2MetricLabel: string | null,
-  delta1MetricLabel: string | null,
-  delta2MetricLabel: string | null,
-): DetailDataRaw {
-  const result: RawDetailRow[] = rows.map(row => ({
-    primaryGroup: primaryCol ? String(row[primaryCol] ?? 'N/A') : 'Total',
-    secondaryGroup: secondaryCol ? String(row[secondaryCol] ?? 'N/A') : 'Total',
-    metricValue: Number(row[metricLabel] ?? 0),
-    comp1Value: comp1MetricLabel ? Number(row[comp1MetricLabel] ?? 0) : null,
-    comp2Value: comp2MetricLabel ? Number(row[comp2MetricLabel] ?? 0) : null,
-    delta1Value: delta1MetricLabel != null ? Number(row[delta1MetricLabel] ?? 0) : null,
-    delta2Value: delta2MetricLabel != null ? Number(row[delta2MetricLabel] ?? 0) : null,
-  }));
-
-  return { rows: result };
-}
 
 // ═══════════════════════════════════════
 // Main transform
@@ -263,8 +241,6 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const showDelta2 = formData.showDelta2 ?? true;
 
   // ── Base formatters ──
-  const formatValueA = createValueFormatter(formData.numberFormatA, autoRussian);
-  const formatValueB = createValueFormatter(formData.numberFormatB, autoRussian);
   const formatDelta = createDeltaFormatter(autoRussian);
 
   // ── Per-value formatters (suffix + decimals baked in) ──
@@ -384,6 +360,37 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         formData.metricDelta1B, formData.metricDelta2B])
     : [];
 
+  // Convert adhoc_filters → simple {col, op, val} + freeform SQL in extras
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adhocFilters = ((formData.adhoc_filters ?? []) as any[]) as Array<Record<string, unknown>>;
+  const simpleFilters: Array<{ col: string; op: string; val?: unknown }> = [];
+  const freeformWhere: string[] = [];
+  const freeformHaving: string[] = [];
+
+  for (const f of adhocFilters) {
+    if (f.expressionType === 'SIMPLE') {
+      simpleFilters.push({
+        col: f.subject as string,
+        op: f.operator as string,
+        val: f.comparator,
+      });
+    } else if (f.expressionType === 'SQL') {
+      const sql = `(${f.sqlExpression as string})`;
+      if (f.clause === 'HAVING') freeformHaving.push(sql);
+      else freeformWhere.push(sql);
+    }
+  }
+
+  const detailExtras: Record<string, unknown> = {
+    ...((formData.extras as Record<string, unknown>) ?? {}),
+  };
+  if (freeformWhere.length > 0) {
+    detailExtras.where = freeformWhere.join(' AND ');
+  }
+  if (freeformHaving.length > 0) {
+    detailExtras.having = freeformHaving.join(' AND ');
+  }
+
   const detailQueryParams: DetailQueryParams | undefined = hasGroupby
     ? {
         datasourceId: dsId,
@@ -396,8 +403,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         metricLabelsB: metricsB.map(m => getMetricLabel(m)),
         timeRange: formData.time_range as string | undefined,
         granularity: formData.granularity_sqla as string | undefined,
-        filters: (formData.adhoc_filters as unknown[]) ?? [],
-        extras: (formData.extras as Record<string, unknown>) ?? {},
+        filters: simpleFilters,
+        extras: detailExtras,
         metricALabel,
         metricBLabel,
         comp1LabelA: comp1A.label,
@@ -501,8 +508,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     detailQueryParams,
 
     // Formatters
-    formatValueA,
-    formatValueB,
+    formatValueA: fmtMainA,
+    formatValueB: fmtMainB,
     formatDelta,
 
     // Top N

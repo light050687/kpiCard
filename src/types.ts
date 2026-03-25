@@ -160,7 +160,10 @@ export interface KpiViewData {
 // Detail Modal — Raw & Formatted
 // ═══════════════════════════════════════
 
-/** Raw numeric row from query — before aggregation/formatting */
+/**
+ * @deprecated Replaced by server-side GROUP BY aggregation.
+ * Raw numeric row from query — before aggregation/formatting.
+ */
 export interface RawDetailRow {
   primaryGroup: string;
   secondaryGroup: string;
@@ -173,7 +176,10 @@ export interface RawDetailRow {
   delta2Value: number | null;
 }
 
-/** Raw detail data passed from transformProps to component */
+/**
+ * @deprecated Replaced by server-side GROUP BY aggregation.
+ * Raw detail data passed from transformProps to component.
+ */
 export interface DetailDataRaw {
   rows: RawDetailRow[];
 }
@@ -194,10 +200,10 @@ export interface DetailQueryParams {
   metricsB: QueryFormMetric[];
   timeRange?: string;
   granularity?: string;
-  /** Superset filters (native + extra) */
-  filters: unknown[];
+  /** Simple filters converted from adhoc_filters ({col, op, val} format) */
+  filters: Array<{ col: string; op: string; val?: unknown }>;
   extras: Record<string, unknown>;
-  /** Comp/delta metric labels for extractDetailRows */
+  /** Comp/delta metric labels for formatServerRow */
   comp1LabelA: string | null;
   comp2LabelA: string | null;
   delta1LabelA: string | null;

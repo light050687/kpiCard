@@ -3,11 +3,9 @@ import React, {
   useCallback,
   useEffect,
   useRef,
-  useMemo,
 } from 'react';
 import { SupersetClient } from '@superset-ui/core';
 import {
-  DetailDataRaw,
   DetailQueryParams,
   DeltaFormat,
   DetailGroup,
@@ -16,8 +14,15 @@ import {
   AggregationType,
   ComparisonColorScheme,
 } from './types';
-import { aggregateDetailData } from './utils/aggregation';
-import { extractDetailRows } from './plugin/transformProps';
+import {
+  buildGroupsPayload,
+  buildChildrenPayload,
+  buildCountPayload,
+  buildExportPayload,
+  formatServerRow,
+  resolveSortTarget,
+} from './utils/detailApi';
+import type { FormatRowOpts } from './utils/detailApi';
 import {
   Overlay,
   Modal,
@@ -44,20 +49,23 @@ import {
   Chevron,
   TablePill,
   EmptyRow,
+  PaginationWrap,
+  PageBtn,
+  PageEllipsis,
+  PageInput,
   ModalFoot,
   FooterHint,
   ExportButton,
+  RefreshBar,
 } from './styles';
 
-/* ── Constants ── */
-
-const CLOSE_DURATION_MS = 300;
+const CLOSE_DURATION_MS = 200;
 
 type SearchScope = 'group' | 'child';
 
 /* ── CSV Export ── */
 
-function exportToCsv(
+async function exportToCsv(
   data: DetailGroup[],
   title: string,
   groupLabel: string,
@@ -69,12 +77,13 @@ function exportToCsv(
   factHeader: string,
   delta1Header: string,
   delta2Header: string,
-): void {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fileHandle: any,
+): Promise<void> {
   const BOM = '\uFEFF';
   const headers = [groupLabel, childLabel, factHeader];
   if (enableComp1) {
     headers.push(comp1Header);
-    // delta1 column added only if data has deltas (delta1Header present)
     headers.push(delta1Header);
   }
   if (enableComp2) {
@@ -98,6 +107,16 @@ function exportToCsv(
     [headers, ...rows].map(row => row.map(escape).join(';')).join('\n');
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+
+  // Write to pre-obtained file handle (from showSaveFilePicker)
+  if (fileHandle) {
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return;
+  }
+
+  // Fallback: auto-download for older browsers
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement('a');
   anchor.href = url;
@@ -146,6 +165,7 @@ function DeltaCell({
 function GroupRowView({
   group,
   expanded,
+  isLoadingChildren,
   onToggle,
   enableComp1,
   enableComp2,
@@ -154,6 +174,7 @@ function GroupRowView({
 }: {
   group: DetailGroup;
   expanded: boolean;
+  isLoadingChildren: boolean;
   onToggle: () => void;
   enableComp1: boolean;
   enableComp2: boolean;
@@ -164,7 +185,20 @@ function GroupRowView({
   return (
     <GroupRow onClick={onToggle}>
       <td>
-        <Chevron expanded={expanded} aria-hidden="true">▶</Chevron>
+        {isLoadingChildren ? (
+          <span
+            style={{
+              display: 'inline-block', width: 10, height: 10, marginRight: 6,
+              border: '1.5px solid var(--g200, #e5e5e5)',
+              borderTopColor: 'var(--c-sky, #3B8BD9)',
+              borderRadius: '50%',
+              animation: 'kpi-spin 0.7s linear infinite',
+            }}
+            aria-label="Загрузка"
+          />
+        ) : (
+          <Chevron expanded={expanded} aria-hidden="true">▶</Chevron>
+        )}
         {group.name}
       </td>
       <td className="r">{summary.value}</td>
@@ -247,6 +281,13 @@ interface DetailModalProps {
   isDarkMode: boolean;
 }
 
+/* ── Helper: extract API response rows ── */
+
+function extractApiRows(json: Record<string, unknown>): Record<string, unknown>[] {
+  const resultArr = json.result as Array<{ data: Record<string, unknown>[] }> | undefined;
+  return resultArr?.[0]?.data ?? [];
+}
+
 /* ── Main component ── */
 
 function DetailModalInner({
@@ -282,7 +323,7 @@ function DetailModalInner({
   showDelta2 = true,
   topN,
   pageSize = 20,
-}: DetailModalProps): JSX.Element | null {
+}: DetailModalProps): JSX.Element {
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('group');
@@ -311,52 +352,116 @@ function DetailModalInner({
   const delta1Header = colDelta1;
   const delta2Header = colDelta2;
 
-  /* ── Lazy fetch detail data via SupersetClient ── */
+  /* ── Server-side data state ── */
 
-  const [detailDataRaw, setDetailDataRaw] = useState<DetailDataRaw | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [groups, setGroups] = useState<DetailGroup[]>([]);
+  const [hasNextPage, setHasNextPage] = useState(false);
+  const [totalCount, setTotalCount] = useState<number | null>(null);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
-  const abortRef = useRef<AbortController | null>(null);
+  const [expandedChildren, setExpandedChildren] = useState<Map<string, DetailRow[]>>(new Map());
+  const [loadingChildren, setLoadingChildren] = useState<Set<string>>(new Set());
+  const [isExporting, setIsExporting] = useState(false);
 
-  // Fetch on open or mode change
+  // Abort controllers
+  const groupsAbortRef = useRef<AbortController | null>(null);
+  const childrenAbortRef = useRef<Map<string, AbortController>>(new Map());
+  const hasEverLoaded = useRef(false);
+
+  /* ── Debounced search ── */
+
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+      setCurrentPage(0);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  /* ── Resolve metric labels for current mode ── */
+
+  const isA = activeMode === 'a';
+  const metricLabel = isA ? queryParams.metricALabel : queryParams.metricBLabel;
+  const comp1Label_ = isA ? queryParams.comp1LabelA : queryParams.comp1LabelB;
+  const comp2Label_ = isA ? queryParams.comp2LabelA : queryParams.comp2LabelB;
+  const delta1Label_ = isA ? queryParams.delta1LabelA : queryParams.delta1LabelB;
+  const delta2Label_ = isA ? queryParams.delta2LabelA : queryParams.delta2LabelB;
+
+  // Shared formatting options for formatServerRow
+  const fmtOpts: FormatRowOpts = {
+    aggregationType,
+    formatValue,
+    formatDelta,
+    colorScheme1,
+    colorScheme2,
+    enableComp1,
+    enableComp2,
+    deltaFormat1,
+    deltaFormat2,
+    fmtComp1,
+    fmtComp2,
+    fmtDelta1,
+    fmtDelta2,
+    showDelta1,
+    showDelta2,
+  };
+
+  /* ── Resolve groupby columns ── */
+
+  const groupbyCol = isPrimary ? queryParams.groupbyPrimary : queryParams.groupbySecondary;
+  const childCol = isPrimary ? queryParams.groupbySecondary : queryParams.groupbyPrimary;
+
+  /* ── fetchGroups: main server-side paginated query ── */
+
   useEffect(() => {
     if (!isOpen) return;
 
     // Abort previous request
-    abortRef.current?.abort();
+    groupsAbortRef.current?.abort();
     const controller = new AbortController();
-    abortRef.current = controller;
+    groupsAbortRef.current = controller;
 
-    setIsLoading(true);
+    // Stale-while-revalidate: spinner only on first ever load
+    if (!hasEverLoaded.current) {
+      setIsInitialLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     setFetchError(null);
 
-    const isA = activeMode === 'a';
     const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
-    const groupby = [queryParams.groupbyPrimary, queryParams.groupbySecondary]
-      .filter((c): c is string => typeof c === 'string' && c.length > 0);
 
-    if (metrics.length === 0 || groupby.length === 0) {
-      setDetailDataRaw({ rows: [] });
-      setIsLoading(false);
+    if (!groupbyCol || metrics.length === 0) {
+      setGroups([]);
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
       return;
     }
 
-    const payload = {
-      datasource: { id: queryParams.datasourceId, type: queryParams.datasourceType },
-      queries: [{
-        columns: groupby,
-        metrics,
-        time_range: queryParams.timeRange || 'No filter',
-        granularity: queryParams.granularity,
-        filters: queryParams.filters,
-        extras: queryParams.extras,
-        row_limit: 10000,
-        orderby: [],
-        post_processing: [],
-      }],
-      result_format: 'json',
-      result_type: 'full',
-    };
+    // Resolve sort target for server
+    const sortTarget = resolveSortTarget(
+      sortColumn, groupbyCol, metricLabel,
+      comp1Label_, comp2Label_, delta1Label_, delta2Label_,
+    );
+
+    const effectivePageSize = topN > 0 ? Math.min(pageSize, topN) : pageSize;
+
+    const payload = buildGroupsPayload({
+      queryParams,
+      activeMode,
+      groupbyCol,
+      childCol,
+      page: currentPage,
+      pageSize: effectivePageSize,
+      sortTarget,
+      sortAsc: sortDirection === 'asc',
+      searchQuery: debouncedSearch,
+      searchScope,
+      metricLabel,
+    });
 
     SupersetClient.post({
       endpoint: 'api/v1/chart/data',
@@ -364,143 +469,145 @@ function DetailModalInner({
       signal: controller.signal,
     })
       .then(({ json }: { json: Record<string, unknown> }) => {
-        const resultArr = json.result as Array<{ data: Record<string, unknown>[] }>;
-        const rows = resultArr?.[0]?.data ?? [];
-        const metricLabel = isA ? queryParams.metricALabel : queryParams.metricBLabel;
-        const comp1Label_ = isA ? queryParams.comp1LabelA : queryParams.comp1LabelB;
-        const comp2Label_ = isA ? queryParams.comp2LabelA : queryParams.comp2LabelB;
-        const delta1Label_ = isA ? queryParams.delta1LabelA : queryParams.delta1LabelB;
-        const delta2Label_ = isA ? queryParams.delta2LabelA : queryParams.delta2LabelB;
+        const rows = extractApiRows(json);
 
-        const detailData = extractDetailRows(
-          rows,
-          queryParams.groupbyPrimary,
-          queryParams.groupbySecondary,
-          metricLabel,
-          comp1Label_,
-          comp2Label_,
-          delta1Label_,
-          delta2Label_,
+        const hasMore = rows.length > effectivePageSize;
+        const displayRows = hasMore ? rows.slice(0, effectivePageSize) : rows;
+
+        const formatted = displayRows.map(row =>
+          formatServerRow(row, groupbyCol!, metricLabel, comp1Label_, comp2Label_, delta1Label_, delta2Label_, fmtOpts),
         );
-        setDetailDataRaw(detailData);
-        setIsLoading(false);
+
+        setGroups(formatted.map(f => ({
+          name: f.name,
+          summary: f.summary,
+          children: [], // children loaded lazily on expand
+        })));
+        setHasNextPage(hasMore);
+
+        // Reset expanded state on new data (page/sort/search change)
+        setExpandedGroups(new Set());
+        setExpandedChildren(new Map());
+        hasEverLoaded.current = true;
+        setIsInitialLoading(false);
+        setIsRefreshing(false);
       })
       .catch((err: Error) => {
         if (err.name !== 'AbortError') {
           setFetchError('Ошибка загрузки данных');
-          setIsLoading(false);
+          setIsInitialLoading(false);
+          setIsRefreshing(false);
         }
       });
 
     return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activeMode, queryParams.datasourceId]);
+  }, [isOpen, activeMode, currentPage, sortColumn, sortDirection, hierarchyMode, debouncedSearch, searchScope, queryParams.datasourceId]);
 
-  /* ── Aggregate data into both hierarchy variants for instant swap ── */
+  /* ── fetchTotalCount: exact count of non-zero groups ── */
 
-  const aggregatedPrimary = useMemo(() => {
-    if (!detailDataRaw?.rows?.length) return [];
-    return aggregateDetailData({
-      rows: detailDataRaw.rows,
-      groupByField: 'primaryGroup',
-      childField: 'secondaryGroup',
-      aggregationType, topN, formatValue, formatDelta,
-      colorScheme1, colorScheme2, enableComp1, enableComp2,
-      deltaFormat1, deltaFormat2, fmtComp1, fmtComp2,
-      fmtDelta1, fmtDelta2, showDelta1, showDelta2,
+  useEffect(() => {
+    if (!isOpen || !groupbyCol) return;
+
+    // Don't reset totalCount — keep old pagination visible (stale-while-revalidate)
+
+    const countPayload = buildCountPayload({
+      queryParams,
+      activeMode,
+      groupbyCol,
+      childCol,
+      searchQuery: debouncedSearch,
+      searchScope,
+      metricLabel,
     });
+
+    SupersetClient.post({
+      endpoint: 'api/v1/chart/data',
+      jsonPayload: countPayload,
+    })
+      .then(({ json }: { json: Record<string, unknown> }) => {
+        const rows = extractApiRows(json);
+        setTotalCount(rows.length);
+      })
+      .catch(() => {
+        // Non-critical — UI works without exact count
+        setTotalCount(null);
+      });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detailDataRaw]);
+  }, [isOpen, activeMode, hierarchyMode, debouncedSearch, searchScope, queryParams.datasourceId]);
 
-  const aggregatedSecondary = useMemo(() => {
-    if (!detailDataRaw?.rows?.length) return [];
-    return aggregateDetailData({
-      rows: detailDataRaw.rows,
-      groupByField: 'secondaryGroup',
-      childField: 'primaryGroup',
-      aggregationType, topN, formatValue, formatDelta,
-      colorScheme1, colorScheme2, enableComp1, enableComp2,
-      deltaFormat1, deltaFormat2, fmtComp1, fmtComp2,
-      fmtDelta1, fmtDelta2, showDelta1, showDelta2,
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [detailDataRaw]);
+  /* ── fetchChildren: load children on group expand ── */
 
-  const aggregatedData = isPrimary ? aggregatedPrimary : aggregatedSecondary;
-
-  /* ── Search filtering (by scope: group or child) ── */
-
-  const filteredData = useMemo(() => {
-    const q = searchQuery.toLowerCase().trim();
-    if (!q) return aggregatedData;
-
-    if (searchScope === 'group') {
-      // Search by group name only — matching group shows all children
-      return aggregatedData.filter(group =>
-        group.name.toLowerCase().includes(q),
-      );
+  const fetchChildren = useCallback((groupName: string): void => {
+    // Already loaded — just toggle visibility
+    if (expandedChildren.has(groupName)) {
+      setExpandedGroups(prev => {
+        const next = new Set(prev);
+        if (next.has(groupName)) next.delete(groupName);
+        else next.add(groupName);
+        return next;
+      });
+      return;
     }
 
-    // searchScope === 'child' — search by child name only
-    return aggregatedData
-      .map(group => {
-        const matchingChildren = group.children.filter(child =>
-          child.name.toLowerCase().includes(q),
-        );
-        if (matchingChildren.length > 0) {
-          return { ...group, children: matchingChildren };
-        }
-        return null;
-      })
-      .filter((g): g is DetailGroup => g !== null);
-  }, [aggregatedData, searchQuery, searchScope]);
+    if (!groupbyCol || !childCol) return;
 
-  // Reset page on search/flip
-  useEffect(() => { setCurrentPage(0); }, [searchQuery, hierarchyMode]);
+    // Abort previous request for this group
+    childrenAbortRef.current.get(groupName)?.abort();
+    const controller = new AbortController();
+    childrenAbortRef.current.set(groupName, controller);
+
+    setLoadingChildren(prev => new Set(prev).add(groupName));
+
+    const payload = buildChildrenPayload({
+      queryParams,
+      activeMode,
+      parentCol: groupbyCol,
+      parentValue: groupName,
+      childCol,
+      metricLabel,
+    });
+
+    SupersetClient.post({
+      endpoint: 'api/v1/chart/data',
+      jsonPayload: payload,
+      signal: controller.signal,
+    })
+      .then(({ json }: { json: Record<string, unknown> }) => {
+        const rows = extractApiRows(json);
+        const children = rows.map(row =>
+          formatServerRow(row, childCol!, metricLabel, comp1Label_, comp2Label_, delta1Label_, delta2Label_, fmtOpts).summary,
+        );
+
+        setExpandedChildren(prev => {
+          const next = new Map(prev);
+          next.set(groupName, children);
+          return next;
+        });
+        setExpandedGroups(prev => {
+          const next = new Set(prev);
+          next.add(groupName);
+          return next;
+        });
+        setLoadingChildren(prev => {
+          const next = new Set(prev);
+          next.delete(groupName);
+          return next;
+        });
+      })
+      .catch((err: Error) => {
+        if (err.name !== 'AbortError') {
+          setLoadingChildren(prev => {
+            const next = new Set(prev);
+            next.delete(groupName);
+            return next;
+          });
+        }
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedChildren, groupbyCol, childCol, queryParams.datasourceId, activeMode, metricLabel]);
 
   /* ── Sorting ── */
-  const parseNumeric = (s: string | undefined): number => {
-    if (!s) return 0;
-    // Detect Russian abbreviation multiplier
-    let multiplier = 1;
-    if (/млрд/i.test(s)) multiplier = 1_000_000_000;
-    else if (/млн/i.test(s)) multiplier = 1_000_000;
-    else if (/тыс/i.test(s)) multiplier = 1_000;
-    // Handle minus sign (−) and Russian comma decimal
-    const clean = s.replace(/[^\d,\-−.]/g, '').replace('−', '-').replace(',', '.');
-    return (parseFloat(clean) || 0) * multiplier;
-  };
-
-  const sortedData = useMemo(() => {
-    const data = [...filteredData];
-    const dir = sortDirection === 'asc' ? 1 : -1;
-    data.sort((a, b) => {
-      let aVal: string | number;
-      let bVal: string | number;
-      if (sortColumn === 'name') {
-        return dir * a.name.localeCompare(b.name, 'ru');
-      }
-      aVal = parseNumeric(a.summary[sortColumn]);
-      bVal = parseNumeric(b.summary[sortColumn]);
-      return dir * ((aVal as number) - (bVal as number));
-    });
-    // Sort children within each group by same column
-    return data.map(group => ({
-      ...group,
-      children: [...group.children].sort((a, b) => {
-        if (sortColumn === 'name') return dir * a.name.localeCompare(b.name, 'ru');
-        return dir * (parseNumeric(a[sortColumn]) - parseNumeric(b[sortColumn]));
-      }),
-    }));
-  }, [filteredData, sortColumn, sortDirection]);
-
-  /* ── Pagination ── */
-  const totalGroups = sortedData.length;
-  const totalPages = pageSize > 0 ? Math.ceil(totalGroups / pageSize) : 1;
-  const pagedData = pageSize > 0
-    ? sortedData.slice(currentPage * pageSize, (currentPage + 1) * pageSize)
-    : sortedData;
-  const groupCount = totalGroups;
 
   const handleSort = (col: SortColumn): void => {
     if (sortColumn === col) {
@@ -526,6 +633,7 @@ function DetailModalInner({
       setSearchQuery('');
       setSearchScope('group');
       setExpandedGroups(new Set());
+      setExpandedChildren(new Map());
       onClose();
     }, CLOSE_DURATION_MS);
   }, [onClose]);
@@ -576,30 +684,95 @@ function DetailModalInner({
     [],
   );
 
-  /* ── Group expand/collapse ── */
-
-  const toggleGroup = useCallback((name: string): void => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(name)) next.delete(name);
-      else next.add(name);
-      return next;
-    });
-  }, []);
-
   /* ── Hierarchy flip ── */
 
   const flipHierarchy = useCallback((): void => {
     setHierarchyMode(prev => (prev === 'primary' ? 'secondary' : 'primary'));
-    setExpandedGroups(new Set());
-    setSearchQuery('');
+    setCurrentPage(0); // page 0 needed — different groupby
+    // expanded/children reset in fetchGroups .then()
+    // searchQuery preserved — user decides
   }, []);
 
-  /* ── Export ── */
+  /* ── Export (server-side fetch with both GROUP BY columns) ── */
 
-  const handleExport = useCallback((): void => {
-    exportToCsv(filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header, colFact, delta1Header, delta2Header);
-  }, [filteredData, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header, colFact, delta1Header, delta2Header]);
+  const handleExport = useCallback(async (): Promise<void> => {
+    if (!groupbyCol || !childCol) return;
+
+    // Step 1: Show "Save As" dialog IMMEDIATELY (requires user gesture)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let fileHandle: any = null;
+    if ('showSaveFilePicker' in window) {
+      try {
+        // @ts-expect-error showSaveFilePicker not in all TS lib types
+        fileHandle = await window.showSaveFilePicker({
+          suggestedName: `${title}-detail.csv`,
+          types: [{ description: 'CSV', accept: { 'text/csv': ['.csv'] } }],
+        });
+      } catch {
+        return; // user cancelled dialog
+      }
+    }
+
+    // Step 2: Fetch data from server
+    setIsExporting(true);
+    try {
+      const payload = buildExportPayload(
+        queryParams, activeMode, groupbyCol, childCol,
+        metricLabel, debouncedSearch, searchScope,
+      );
+
+      const { json } = await SupersetClient.post({
+        endpoint: 'api/v1/chart/data',
+        jsonPayload: payload,
+      }) as { json: Record<string, unknown> };
+
+      const rows = extractApiRows(json);
+
+      // Group rows by parent column for CSV structure
+      const groupedMap = new Map<string, DetailRow[]>();
+      for (const row of rows) {
+        const parentName = String(row[groupbyCol!] ?? 'N/A');
+        const childFormatted = formatServerRow(
+          row, childCol!, metricLabel,
+          comp1Label_, comp2Label_, delta1Label_, delta2Label_, fmtOpts,
+        );
+        const existing = groupedMap.get(parentName);
+        if (existing) {
+          existing.push(childFormatted.summary);
+        } else {
+          groupedMap.set(parentName, [childFormatted.summary]);
+        }
+      }
+
+      // Build DetailGroup[] for CSV export
+      const exportGroups: DetailGroup[] = [];
+      for (const [name, children] of groupedMap) {
+        const parentRow = formatServerRow(
+          { [groupbyCol!]: name } as Record<string, unknown>,
+          groupbyCol!, metricLabel,
+          comp1Label_, comp2Label_, delta1Label_, delta2Label_, fmtOpts,
+        );
+        exportGroups.push({ name, summary: parentRow.summary, children });
+      }
+
+      // Step 3: Write CSV to file handle (or fallback download)
+      await exportToCsv(exportGroups, title, groupLabel, childLabel, enableComp1, enableComp2, comp1Header, comp2Header, colFact, delta1Header, delta2Header, fileHandle);
+    } finally {
+      setIsExporting(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [groupbyCol, childCol, queryParams.datasourceId, activeMode, metricLabel, debouncedSearch, searchScope, title, groupLabel, childLabel]);
+
+  /* ── Cleanup abort controllers on close ── */
+
+  useEffect(() => {
+    if (!isOpen) {
+      groupsAbortRef.current?.abort();
+      childrenAbortRef.current.forEach(c => c.abort());
+      childrenAbortRef.current.clear();
+      hasEverLoaded.current = false;
+    }
+  }, [isOpen]);
 
   /* ── Compute column count for table-layout ── */
 
@@ -612,8 +785,6 @@ function DetailModalInner({
 
   /* ── Render guard ── */
 
-  // Always keep modal in DOM — hidden via CSS when closed.
-  // This eliminates React mount delay when opening.
   const isHidden = !isOpen && !isClosing;
 
   return (
@@ -654,14 +825,14 @@ function DetailModalInner({
             <SearchScopeToggle>
               <SearchScopeButton
                 active={searchScope === 'group'}
-                onClick={() => { setSearchScope('group'); setExpandedGroups(new Set()); }}
+                onClick={() => setSearchScope('group')}
                 aria-label={`Поиск по ${groupLabel}`}
               >
                 {groupLabel}
               </SearchScopeButton>
               <SearchScopeButton
                 active={searchScope === 'child'}
-                onClick={() => { setSearchScope('child'); setExpandedGroups(new Set()); }}
+                onClick={() => setSearchScope('child')}
                 aria-label={`Поиск по ${childLabel}`}
               >
                 {childLabel}
@@ -681,7 +852,7 @@ function DetailModalInner({
             </FlipLabel>
           </FlipButton>
 
-          <ResultsCount>{groupLabel}: {groupCount}</ResultsCount>
+          <ResultsCount>{groupLabel}: {totalCount != null ? totalCount : `${groups.length}${hasNextPage ? '+' : ''}`}</ResultsCount>
         </ModalToolbar>
 
         {/* ── Table — dynamic columns ── */}
@@ -717,8 +888,13 @@ function DetailModalInner({
                 )}
               </THRow>
             </THead>
-            <tbody>
-              {isLoading ? (
+            {isRefreshing && <RefreshBar />}
+            <tbody style={{
+              opacity: isRefreshing ? 0.45 : 1,
+              transition: 'opacity 0.15s ease',
+              pointerEvents: isRefreshing ? 'none' : 'auto',
+            }}>
+              {isInitialLoading ? (
                 <EmptyRow>
                   <td colSpan={colCount}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
@@ -741,7 +917,7 @@ function DetailModalInner({
                       <span>{fetchError}</span>
                       <button
                         type="button"
-                        onClick={() => { setFetchError(null); setIsLoading(true); }}
+                        onClick={() => { setFetchError(null); setCurrentPage(p => p); }}
                         style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--g300)', background: 'var(--s)', cursor: 'pointer', fontSize: 12 }}
                       >
                         Повторить
@@ -749,26 +925,31 @@ function DetailModalInner({
                     </div>
                   </td>
                 </EmptyRow>
-              ) : filteredData.length === 0 ? (
+              ) : groups.length === 0 ? (
                 <EmptyRow>
-                  <td colSpan={colCount}>Ничего не найдено</td>
+                  <td colSpan={colCount}>
+                    {debouncedSearch ? 'Ничего не найдено' : 'Нет данных'}
+                  </td>
                 </EmptyRow>
               ) : (
-                pagedData.flatMap(group => {
+                groups.flatMap(group => {
                   const isExpanded = expandedGroups.has(group.name);
+                  const children = expandedChildren.get(group.name) ?? [];
+                  const isChildLoading = loadingChildren.has(group.name);
                   return [
                     <GroupRowView
                       key={`g-${group.name}`}
                       group={group}
                       expanded={isExpanded}
-                      onToggle={() => toggleGroup(group.name)}
+                      isLoadingChildren={isChildLoading}
+                      onToggle={() => fetchChildren(group.name)}
                       enableComp1={enableComp1}
                       enableComp2={enableComp2}
                       showDelta1={showDelta1}
                       showDelta2={showDelta2}
                     />,
                     ...(isExpanded
-                      ? group.children.map(child => (
+                      ? children.map(child => (
                           <ChildRowView
                             key={`c-${group.name}-${child.name}`}
                             row={child}
@@ -786,47 +967,101 @@ function DetailModalInner({
           </DetailTable>
         </TableWrap>
 
-        {/* ── Pagination ── */}
-        {totalPages > 1 && (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '8px 0', fontSize: 13, color: '#666' }}>
-            <button
-              type="button"
-              onClick={() => setCurrentPage(p => Math.max(0, p - 1))}
-              disabled={currentPage === 0}
-              style={{ cursor: currentPage === 0 ? 'default' : 'pointer', opacity: currentPage === 0 ? 0.4 : 1, background: 'none', border: 'none', fontSize: 13, color: 'inherit' }}
-            >
-              ← Назад
-            </button>
-            <span>{currentPage + 1} из {totalPages}</span>
-            <button
-              type="button"
-              onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))}
-              disabled={currentPage >= totalPages - 1}
-              style={{ cursor: currentPage >= totalPages - 1 ? 'default' : 'pointer', opacity: currentPage >= totalPages - 1 ? 0.4 : 1, background: 'none', border: 'none', fontSize: 13, color: 'inherit' }}
-            >
-              Далее →
-            </button>
-          </div>
-        )}
+        {/* Numbered pagination */}
+        {(() => {
+          const effectivePageSize = topN > 0 ? Math.min(pageSize, topN) : pageSize;
+          const totalPages = totalCount != null ? Math.ceil(totalCount / effectivePageSize) : null;
+          if (totalPages == null || totalPages <= 1) return null;
+
+          const getPageNumbers = (current0: number, total: number): (number | '...')[] => {
+            if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+            const pages = new Set<number>();
+            pages.add(1);
+            pages.add(total); pages.add(total - 1); pages.add(total - 2);
+            const cur1 = current0 + 1;
+            pages.add(cur1);
+            if (cur1 > 1) pages.add(cur1 - 1);
+            if (cur1 < total) pages.add(cur1 + 1);
+            const sorted = [...pages].filter(p => p >= 1 && p <= total).sort((a, b) => a - b);
+            const result: (number | '...')[] = [];
+            for (let i = 0; i < sorted.length; i++) {
+              if (i > 0 && sorted[i] - sorted[i - 1] > 1) result.push('...');
+              result.push(sorted[i]);
+            }
+            return result;
+          };
+
+          return (
+            <PaginationWrap style={{
+              opacity: isRefreshing ? 0.5 : 1,
+              pointerEvents: isRefreshing ? 'none' : 'auto',
+              transition: 'opacity 0.15s ease',
+            }}>
+              {getPageNumbers(currentPage, totalPages).map((item, idx) =>
+                item === '...'
+                  ? <PageEllipsis key={`e${idx}`}>…</PageEllipsis>
+                  : <PageBtn
+                      key={item}
+                      type="button"
+                      isActive={item === currentPage + 1}
+                      aria-label={`Страница ${item}`}
+                      aria-current={item === currentPage + 1 ? 'page' : undefined}
+                      onClick={() => setCurrentPage((item as number) - 1)}
+                      disabled={isRefreshing}
+                    >
+                      {item}
+                    </PageBtn>
+              )}
+              {totalPages > 7 && (
+                <PageInput
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  placeholder="№"
+                  aria-label="Перейти на страницу"
+                  disabled={isRefreshing}
+                  onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if (e.key === 'Enter') {
+                      const val = parseInt((e.target as HTMLInputElement).value, 10);
+                      if (val >= 1 && val <= totalPages) {
+                        setCurrentPage(val - 1);
+                        (e.target as HTMLInputElement).value = '';
+                      }
+                    }
+                  }}
+                />
+              )}
+            </PaginationWrap>
+          );
+        })()}
 
         {/* ── Footer ── */}
         <ModalFoot>
-          <FooterHint>▶ раскрыть детализацию</FooterHint>
-          <ExportButton onClick={handleExport} aria-label="Экспорт данных">
+          <FooterHint>
+            ▶ раскрыть детализацию&ensp;·&ensp;<svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{verticalAlign: 'middle'}}><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></svg> экспорт
+          </FooterHint>
+          <ExportButton
+            onClick={handleExport}
+            aria-label="Экспорт данных в CSV"
+            title="Сохранить как CSV"
+            disabled={isExporting}
+          >
             <svg
-              width="13"
-              height="13"
+              width="18"
+              height="18"
               viewBox="0 0 16 16"
               fill="none"
               stroke="currentColor"
-              strokeWidth="1.8"
+              strokeWidth="1.4"
               strokeLinecap="round"
               strokeLinejoin="round"
               aria-hidden="true"
             >
-              <path d="M8 2v9M4 7.5 8 11l4-3.5M3 14h10" />
+              <path d="M2 2h8.5L13 4.5V14H2V2z" />
+              <path d="M4 2v4h6V2" />
+              <path d="M9 3v2" />
+              <path d="M4 9h6v5H4z" />
             </svg>
-            {' '}Экспорт
           </ExportButton>
         </ModalFoot>
       </Modal>
@@ -850,5 +1085,7 @@ function areDetailPropsEqual(prev: DetailModalProps, next: DetailModalProps): bo
   return true;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export default React.memo(DetailModalInner, areDetailPropsEqual) as any as typeof DetailModalInner;
+export default React.memo(
+  DetailModalInner,
+  areDetailPropsEqual,
+) as unknown as React.ComponentType<DetailModalProps>;

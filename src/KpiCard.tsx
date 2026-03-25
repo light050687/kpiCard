@@ -588,6 +588,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
       </Card>
 
       {hasDetail && detailQueryParams && (
+        // @ts-expect-error React.memo type compat with @types/react 17
         <DetailModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
