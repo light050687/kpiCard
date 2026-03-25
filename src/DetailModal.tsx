@@ -36,6 +36,7 @@ import {
   SearchInput,
   SearchScopeToggle,
   SearchScopeButton,
+  ExactMatchLabel,
   FlipButton,
   FlipIcon,
   FlipLabel,
@@ -330,6 +331,7 @@ function DetailModalInner({
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('group');
+  const [exactMatch, setExactMatch] = useState(false);
   const [hierarchyMode, setHierarchyMode] =
     useState<HierarchyMode>('primary');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
@@ -463,6 +465,7 @@ function DetailModalInner({
       sortAsc: sortDirection === 'asc',
       searchQuery: debouncedSearch,
       searchScope,
+      exactMatch,
       metricLabel,
     });
 
@@ -505,7 +508,7 @@ function DetailModalInner({
 
     return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activeMode, currentPage, sortColumn, sortDirection, hierarchyMode, debouncedSearch, searchScope, queryParams.datasourceId]);
+  }, [isOpen, activeMode, currentPage, sortColumn, sortDirection, hierarchyMode, debouncedSearch, searchScope, exactMatch, queryParams.datasourceId]);
 
   /* ── fetchTotalCount: exact count of non-zero groups ── */
 
@@ -521,6 +524,7 @@ function DetailModalInner({
       childCol,
       searchQuery: debouncedSearch,
       searchScope,
+      exactMatch,
       metricLabel,
     });
 
@@ -537,7 +541,7 @@ function DetailModalInner({
         setTotalCount(null);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activeMode, hierarchyMode, debouncedSearch, searchScope, queryParams.datasourceId]);
+  }, [isOpen, activeMode, hierarchyMode, debouncedSearch, searchScope, exactMatch, queryParams.datasourceId]);
 
   /* ── fetchChildren: load children on group expand ── */
 
@@ -571,6 +575,7 @@ function DetailModalInner({
       metricLabel,
       searchQuery: debouncedSearch,
       searchScope,
+      exactMatch,
     });
 
     SupersetClient.post({
@@ -693,6 +698,7 @@ function DetailModalInner({
 
   const flipHierarchy = useCallback((): void => {
     setHierarchyMode(prev => (prev === 'primary' ? 'secondary' : 'primary'));
+    setSearchScope(prev => (prev === 'group' ? 'child' : 'group')); // preserve column intent
     setCurrentPage(0); // page 0 needed — different groupby
     // expanded/children reset in fetchGroups .then()
     // searchQuery preserved — user decides
@@ -723,7 +729,7 @@ function DetailModalInner({
     try {
       const payload = buildExportPayload(
         queryParams, activeMode, groupbyCol, childCol,
-        metricLabel, debouncedSearch, searchScope,
+        metricLabel, debouncedSearch, searchScope, exactMatch,
       );
 
       const { json } = await SupersetClient.post({
@@ -819,6 +825,14 @@ function DetailModalInner({
         {/* ── Toolbar ── */}
         <ModalToolbar>
           <SearchBox>
+            <ExactMatchLabel title="Точное совпадение">
+              <input
+                type="checkbox"
+                checked={exactMatch}
+                onChange={e => setExactMatch(e.target.checked)}
+              />
+              Точно
+            </ExactMatchLabel>
             <MagnifyIcon />
             <SearchInput
               type="text"
@@ -1043,8 +1057,7 @@ function DetailModalInner({
         {/* ── Footer ── */}
         <ModalFoot>
           <FooterHint>
-            ▶ раскрыть детализацию&ensp;·&ensp;<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{verticalAlign: 'middle'}}><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></svg> экспорт
-          </FooterHint>
+            ▶ раскрыть детализацию&ensp;·&ensp;<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{verticalAlign: 'middle'}}><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></svg> экспорт          </FooterHint>
           <ExportButton
             onClick={handleExport}
             aria-label="Экспорт данных в CSV"

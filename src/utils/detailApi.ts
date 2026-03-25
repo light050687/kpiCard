@@ -87,6 +87,7 @@ interface GroupsPayloadParams {
   sortAsc: boolean; // true = ascending, false = descending (matches Superset API)
   searchQuery: string;
   searchScope: 'group' | 'child';
+  exactMatch: boolean;
   metricLabel: string;
 }
 
@@ -100,22 +101,20 @@ export function buildGroupsPayload(
   params: GroupsPayloadParams,
 ): Record<string, unknown> {
   const { queryParams, activeMode, groupbyCol, childCol, page, pageSize,
-    sortTarget, sortAsc, searchQuery, searchScope, metricLabel } = params;
+    sortTarget, sortAsc, searchQuery, searchScope, exactMatch, metricLabel } = params;
 
   const isA = activeMode === 'a';
   const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
 
-  // Build filters: base + search ILIKE
+  // Build filters: base + search
   const filters: Array<{ col: string; op: string; val?: unknown }> = [...queryParams.filters];
   const trimmed = searchQuery.trim();
   if (trimmed) {
     const searchCol =
       searchScope === 'group' ? groupbyCol : (childCol ?? groupbyCol);
-    filters.push({
-      col: searchCol,
-      op: 'ILIKE',
-      val: `%${trimmed}%`,
-    });
+    const op = exactMatch ? '==' : 'ILIKE';
+    const val = exactMatch ? trimmed : `%${trimmed}%`;
+    filters.push({ col: searchCol, op, val });
   }
 
   // Extras with HAVING to filter zero-metric groups (merge with existing)
@@ -173,7 +172,7 @@ export function buildCountPayload(
   params: Omit<GroupsPayloadParams, 'page' | 'pageSize' | 'sortTarget' | 'sortAsc'>,
 ): Record<string, unknown> {
   const { queryParams, activeMode, groupbyCol, childCol,
-    searchQuery, searchScope, metricLabel } = params;
+    searchQuery, searchScope, exactMatch, metricLabel } = params;
 
   const isA = activeMode === 'a';
   const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
@@ -184,7 +183,9 @@ export function buildCountPayload(
   if (trimmed) {
     const searchCol =
       searchScope === 'group' ? groupbyCol : (childCol ?? groupbyCol);
-    filters.push({ col: searchCol, op: 'ILIKE', val: `%${trimmed}%` });
+    const op = exactMatch ? '==' : 'ILIKE';
+    const val = exactMatch ? trimmed : `%${trimmed}%`;
+    filters.push({ col: searchCol, op, val });
   }
 
   // Same HAVING as groups query
@@ -229,6 +230,7 @@ interface ChildrenPayloadParams {
   metricLabel: string;
   searchQuery?: string;
   searchScope?: 'group' | 'child';
+  exactMatch?: boolean;
 }
 
 /**
@@ -240,7 +242,7 @@ export function buildChildrenPayload(
   params: ChildrenPayloadParams,
 ): Record<string, unknown> {
   const { queryParams, activeMode, parentCol, parentValue, childCol,
-    metricLabel, searchQuery, searchScope } = params;
+    metricLabel, searchQuery, searchScope, exactMatch } = params;
 
   const isA = activeMode === 'a';
   const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
@@ -253,7 +255,9 @@ export function buildChildrenPayload(
   // When searching by child scope, also filter children by search query
   const trimmed = searchQuery?.trim();
   if (trimmed && searchScope === 'child') {
-    filters.push({ col: childCol, op: 'ILIKE', val: `%${trimmed}%` });
+    const op = exactMatch ? '==' : 'ILIKE';
+    const val = exactMatch ? trimmed : `%${trimmed}%`;
+    filters.push({ col: childCol, op, val });
   }
 
   // HAVING to filter zero-metric children (same as groups)
@@ -306,6 +310,7 @@ export function buildExportPayload(
   metricLabel: string,
   searchQuery: string,
   searchScope: 'group' | 'child',
+  exactMatch = false,
 ): Record<string, unknown> {
   const isA = activeMode === 'a';
   const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
@@ -314,7 +319,9 @@ export function buildExportPayload(
   const trimmed = searchQuery.trim();
   if (trimmed) {
     const searchCol = searchScope === 'group' ? groupbyCol : childCol;
-    filters.push({ col: searchCol, op: 'ILIKE', val: `%${trimmed}%` });
+    const op = exactMatch ? '==' : 'ILIKE';
+    const val = exactMatch ? trimmed : `%${trimmed}%`;
+    filters.push({ col: searchCol, op, val });
   }
 
   return {

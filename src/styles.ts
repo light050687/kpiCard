@@ -642,6 +642,39 @@ export const SearchScopeButton = styled.button<{ active: boolean }>`
   }
 `;
 
+/** Exact match checkbox label — compact, sits at the start of search bar */
+export const ExactMatchLabel = styled.label`
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--m);
+  font-size: 11px;
+  color: var(--g500);
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  white-space: nowrap;
+  margin-right: 6px;
+
+  input[type='checkbox'] {
+    width: 14px;
+    height: 14px;
+    accent-color: var(--c-sky);
+    cursor: pointer;
+    margin: 0;
+  }
+
+  &::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 16px;
+    background: var(--g200);
+    margin-left: 4px;
+    flex-shrink: 0;
+  }
+`;
+
 export const ModeToggle = styled.div`
   display: flex;
   gap: 1px;
