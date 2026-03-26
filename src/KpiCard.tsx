@@ -28,6 +28,7 @@ import {
   EmptyStateIcon,
   EmptyStateText,
   PartialBadge,
+  MockBadge,
 } from './styles';
 import DetailModal from './DetailModal';
 
@@ -234,6 +235,9 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   formatDelta,
   detailTopN,
   detailPageSize,
+  mockModeEnabled,
+  mockPreset,
+  mockCustomJson,
 }: KpiCardProps): JSX.Element {
   const [activeMode, setActiveMode] = useState<'a' | 'b'>('a');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -510,7 +514,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   // Detail modal only available when active mode has data
   const activeView = isA ? viewA : viewB;
   const activeModeEmpty = activeView.value === '' && activeView.comparisons.length === 0;
-  const hasDetail = hasGroupby && !activeModeEmpty;
+  const hasDetail = (hasGroupby && !activeModeEmpty) || mockModeEnabled;
 
   return (
     <KpiCardRoot
@@ -531,7 +535,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
         onClick={hasDetail ? () => setIsModalOpen(true) : undefined}
       >
         <CardHead>
-          <CardTitle>{headerText}</CardTitle>
+          <CardTitle>{headerText}{mockModeEnabled && <MockBadge>ТЕСТ</MockBadge>}</CardTitle>
           {isPartial && <PartialBadge>Частичные данные</PartialBadge>}
           {isDual && (
             <ToggleGroup role="tablist" aria-label="Toggle mode A / B">
@@ -623,6 +627,9 @@ const KpiCardMemo = React.memo(function KpiCardInner({
           topN={detailTopN}
           pageSize={detailPageSize}
           isDarkMode={isDarkMode}
+          mockModeEnabled={mockModeEnabled}
+          mockPreset={mockPreset}
+          mockCustomJson={mockCustomJson}
         />
       )}
     </KpiCardRoot>

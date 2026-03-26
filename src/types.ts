@@ -122,6 +122,11 @@ export interface KpiCardFormData extends QueryFormData {
   showDelta1: boolean;
   showDelta2: boolean;
 
+  // ── Mock mode (design mode for dashboards without real data) ──
+  mockModeEnabled?: boolean;
+  mockPreset?: 'revenue' | 'expenses' | 'margin' | 'losses' | 'conversion' | 'empty' | 'custom';
+  mockCustomJson?: string;
+
   // ── Detail / Drill-Down ──
   groupbyPrimary?: string;
   groupbySecondary?: string;
@@ -332,4 +337,9 @@ export interface KpiCardProps {
   // ── TOP N & Pagination ──
   detailTopN: number;
   detailPageSize: number;
+
+  // ── Mock mode (design mode) ──
+  mockModeEnabled: boolean;
+  mockPreset: string;
+  mockCustomJson?: string;
 }

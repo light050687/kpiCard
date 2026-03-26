@@ -23,6 +23,23 @@ export default function buildQuery(formData: KpiCardFormData) {
     metric_delta_2b,
   } = formData;
 
+  // Normalize groupby fields — sharedControls.groupby stores arrays even with multi:false
+  // buildQueryContext may call .toLowerCase() on these → crash if array
+  const fd = formData as Record<string, unknown>;
+  if (Array.isArray(fd.groupby_primary)) {
+    fd.groupby_primary = fd.groupby_primary[0] ?? undefined;
+  }
+  if (Array.isArray(fd.groupby_secondary)) {
+    fd.groupby_secondary = fd.groupby_secondary[0] ?? undefined;
+  }
+  // Also normalize the camelCase variants (lodash auto-converts snake_case → camelCase)
+  if (Array.isArray(fd.groupbyPrimary)) {
+    fd.groupbyPrimary = fd.groupbyPrimary[0] ?? undefined;
+  }
+  if (Array.isArray(fd.groupbySecondary)) {
+    fd.groupbySecondary = fd.groupbySecondary[0] ?? undefined;
+  }
+
   return buildQueryContext(formData, baseQueryObject => {
     // ── Collect all metrics from both modes, deduplicate ──
     const allMetrics: QueryFormMetric[] = [];
@@ -52,6 +69,18 @@ export default function buildQuery(formData: KpiCardFormData) {
     addMetric(metric_delta_2a);
     addMetric(metric_delta_1b);
     addMetric(metric_delta_2b);
+
+    // Mock mode: if no real metrics configured, use dummy to avoid "Empty query?"
+    // transformProps will replace data with mock preset anyway
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isMockOn = (formData as any).mock_mode_enabled ?? (formData as any).mockModeEnabled ?? false;
+    if (allMetrics.length === 0 && isMockOn) {
+      allMetrics.push({
+        expressionType: 'SQL',
+        sqlExpression: '1',
+        label: '__mock',
+      } as QueryFormMetric);
+    }
 
     // Pick only safe fields from baseQueryObject to avoid column pollution
     const {

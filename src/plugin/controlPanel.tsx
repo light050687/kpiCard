@@ -29,6 +29,12 @@ const isComp1Enabled = ({ controls }: ControlsMap): boolean =>
 const isComp2Enabled = ({ controls }: ControlsMap): boolean =>
   controls?.enable_comp2?.value === true;
 
+const isMockEnabled = ({ controls }: ControlsMap): boolean =>
+  controls?.mock_mode_enabled?.value === true;
+
+const isMockCustom = ({ controls }: ControlsMap): boolean =>
+  isMockEnabled({ controls }) && controls?.mock_preset?.value === 'custom';
+
 // ═══════════════════════════════════════
 // Control Panel Configuration
 // ═══════════════════════════════════════
@@ -38,10 +44,72 @@ const config: ControlPanelConfig = {
     // ── Section 1: Time ──
     sections.legacyTimeseriesTime,
 
-    // ── Section 2: Query — Mode A ──
+    // ── Section 2: Mock / Design Mode ──
+    {
+      label: t('Режим проектирования'),
+      expanded: false,
+      controlSetRows: [
+        [
+          {
+            name: 'mock_mode_enabled',
+            config: {
+              type: 'CheckboxControl',
+              label: t('Включить режим проектирования'),
+              description: t(
+                'Показывает тестовые данные для согласования дизайна дашборда. ' +
+                'Выключите когда реальные данные будут готовы.',
+              ),
+              default: false,
+              // NO renderTrigger — toggle must trigger buildQuery to inject dummy metric
+            },
+          },
+        ],
+        [
+          {
+            name: 'mock_preset',
+            config: {
+              type: 'SelectControl',
+              label: t('Пресет данных'),
+              default: 'revenue',
+              choices: [
+                ['revenue', t('Выручка (12,4 млрд)')],
+                ['expenses', t('Расходы (3,2 млрд)')],
+                ['margin', t('Маржа (9,2 млрд)')],
+                ['losses', t('Потери (264 млн)')],
+                ['conversion', t('Конверсия (5,63%)')],
+                ['empty', t('Пустой (все нули)')],
+                ['custom', t('Кастом (JSON)')],
+              ],
+              renderTrigger: true,
+              visibility: isMockEnabled,
+            },
+          },
+        ],
+        [
+          {
+            name: 'mock_custom_json',
+            config: {
+              type: 'TextAreaControl',
+              label: t('JSON кастомных данных'),
+              description: t(
+                'Формат: {"mainA": 1000, "comp1A": 900, "comp2A": 800, ' +
+                '"mainB": 10.5, "comp1B": 9.8, "comp2B": 8.2, ' +
+                '"groupCount": 20, "childrenPerGroup": 5}',
+              ),
+              default: '{}',
+              renderTrigger: true,
+              language: 'json',
+              visibility: isMockCustom,
+            },
+          },
+        ],
+      ],
+    },
+
+    // ── Section 3: Query — Mode A ──
     {
       label: t('Запрос — Режим А'),
-      expanded: true,
+      expanded: false,
       controlSetRows: [
         [
           {
@@ -105,7 +173,7 @@ const config: ControlPanelConfig = {
     // ── Section 3: Query — Mode B (only in dual mode) ──
     {
       label: t('Запрос — Режим Б'),
-      expanded: true,
+      expanded: false,
       controlSetRows: [
         [
           {
@@ -173,7 +241,7 @@ const config: ControlPanelConfig = {
     // ── Section 4: Card Display ──
     {
       label: t('Отображение карточки'),
-      expanded: true,
+      expanded: false,
       controlSetRows: [
         [
           {
@@ -225,7 +293,7 @@ const config: ControlPanelConfig = {
     // ── Section 5: Mode A Settings ──
     {
       label: t('Настройки режима А'),
-      expanded: true,
+      expanded: false,
       controlSetRows: [
         [
           {
@@ -422,7 +490,7 @@ const config: ControlPanelConfig = {
     // ── Section 6: Mode B Settings (visible only in dual mode) ──
     {
       label: t('Настройки режима Б'),
-      expanded: true,
+      expanded: false,
       controlSetRows: [
         [
           {
@@ -625,7 +693,7 @@ const config: ControlPanelConfig = {
     // ── Section 7: Comparisons ──
     {
       label: t('Сравнения'),
-      expanded: true,
+      expanded: false,
       controlSetRows: [
         [
           {
@@ -702,7 +770,7 @@ const config: ControlPanelConfig = {
       ],
     },
 
-    // ── Section 8: Detail / Drill-Down ──
+    // ── Section 9: Detail / Drill-Down ──
     {
       label: t('Детализация'),
       expanded: false,

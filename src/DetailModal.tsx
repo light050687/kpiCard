@@ -23,6 +23,8 @@ import {
   resolveSortTarget,
 } from './utils/detailApi';
 import type { FormatRowOpts } from './utils/detailApi';
+import { getPreset } from './mocks/presets';
+import { generateMockGroups, generateMockChildren } from './mocks/mockDetailGenerator';
 import {
   Overlay,
   Modal,
@@ -283,6 +285,9 @@ interface DetailModalProps {
   topN: number;
   pageSize: number;
   isDarkMode: boolean;
+  mockModeEnabled?: boolean;
+  mockPreset?: string;
+  mockCustomJson?: string;
 }
 
 /* ── Helper: extract API response rows ── */
@@ -327,6 +332,9 @@ function DetailModalInner({
   showDelta2 = true,
   topN,
   pageSize = 20,
+  mockModeEnabled = false,
+  mockPreset = 'revenue',
+  mockCustomJson,
 }: DetailModalProps): JSX.Element {
   const [isClosing, setIsClosing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -439,7 +447,7 @@ function DetailModalInner({
 
     const metrics = isA ? queryParams.metricsA : queryParams.metricsB;
 
-    if (!groupbyCol || metrics.length === 0) {
+    if (!groupbyCol || (!mockModeEnabled && metrics.length === 0)) {
       setGroups([]);
       setIsInitialLoading(false);
       setIsRefreshing(false);
@@ -469,6 +477,47 @@ function DetailModalInner({
       metricLabel,
     });
 
+    // ── Mock mode: generate data locally ──
+    if (mockModeEnabled) {
+      const preset = getPreset(mockPreset, mockCustomJson);
+      const mockResult = generateMockGroups({
+        preset,
+        groupbyCol: groupbyCol || 'centrum_code',
+        childCol: childCol || 'category_code',
+        page: currentPage,
+        pageSize: effectivePageSize,
+        sortAsc: sortDirection === 'asc',
+        searchQuery: debouncedSearch,
+        exactMatch,
+        isModeBActive: activeMode === 'b',
+      });
+
+      const mockGroupby = groupbyCol || 'centrum_code';
+      const formatted = mockResult.rows.map(row => {
+        // Map __mock_* keys to metric labels for formatServerRow
+        const mapped: Record<string, unknown> = { [mockGroupby]: row[mockGroupby] };
+        mapped[metricLabel] = row.__mock_main;
+        if (comp1Label_) mapped[comp1Label_] = row.__mock_comp1;
+        if (comp2Label_) mapped[comp2Label_] = row.__mock_comp2;
+        return formatServerRow(mapped, mockGroupby, metricLabel, comp1Label_, comp2Label_, delta1Label_, delta2Label_, fmtOpts);
+      });
+
+      setGroups(formatted.map(f => ({
+        name: f.name,
+        summary: f.summary,
+        children: [],
+      })));
+      setHasNextPage(mockResult.totalCount > (currentPage + 1) * effectivePageSize);
+      setTotalCount(mockResult.totalCount);
+      setExpandedGroups(new Set());
+      setExpandedChildren(new Map());
+      hasEverLoaded.current = true;
+      setIsInitialLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
+    // ── Real data: server-side query ──
     SupersetClient.post({
       endpoint: 'api/v1/chart/data',
       jsonPayload: payload,
@@ -508,12 +557,15 @@ function DetailModalInner({
 
     return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, activeMode, currentPage, sortColumn, sortDirection, hierarchyMode, debouncedSearch, searchScope, exactMatch, queryParams.datasourceId]);
+  }, [isOpen, activeMode, currentPage, sortColumn, sortDirection, hierarchyMode, debouncedSearch, searchScope, exactMatch, queryParams.datasourceId, mockModeEnabled, mockPreset]);
 
   /* ── fetchTotalCount: exact count of non-zero groups ── */
 
   useEffect(() => {
     if (!isOpen || !groupbyCol) return;
+
+    // Mock mode: totalCount already set in fetchGroups
+    if (mockModeEnabled) return;
 
     // Don't reset totalCount — keep old pagination visible (stale-while-revalidate)
 
@@ -559,12 +611,43 @@ function DetailModalInner({
 
     if (!groupbyCol || !childCol) return;
 
+    setLoadingChildren(prev => new Set(prev).add(groupName));
+
+    // ── Mock mode: generate children locally ──
+    if (mockModeEnabled) {
+      const preset = getPreset(mockPreset, mockCustomJson);
+      // Find parent's main value from current groups
+      const parentGroup = groups.find(g => g.name === groupName);
+      const parentMainRaw = parentGroup?.summary.rawValue ?? 0;
+
+      const mockRows = generateMockChildren({
+        preset,
+        groupName,
+        childCol,
+        parentMainValue: parentMainRaw || preset.mainA / preset.groupCount,
+        isModeBActive: activeMode === 'b',
+      });
+
+      const children = mockRows.map(row => {
+        const mapped: Record<string, unknown> = { [childCol]: row[childCol] };
+        mapped[metricLabel] = row.__mock_main;
+        if (comp1Label_) mapped[comp1Label_] = row.__mock_comp1;
+        if (comp2Label_) mapped[comp2Label_] = row.__mock_comp2;
+        return formatServerRow(mapped, childCol, metricLabel, comp1Label_, comp2Label_, delta1Label_, delta2Label_, fmtOpts).summary;
+      });
+
+      setExpandedChildren(prev => { const next = new Map(prev); next.set(groupName, children); return next; });
+      setExpandedGroups(prev => { const next = new Set(prev); next.add(groupName); return next; });
+      setLoadingChildren(prev => { const next = new Set(prev); next.delete(groupName); return next; });
+      return;
+    }
+
+    // ── Real data: server-side query ──
+
     // Abort previous request for this group
     childrenAbortRef.current.get(groupName)?.abort();
     const controller = new AbortController();
     childrenAbortRef.current.set(groupName, controller);
-
-    setLoadingChildren(prev => new Set(prev).add(groupName));
 
     const payload = buildChildrenPayload({
       queryParams,

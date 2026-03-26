@@ -5,6 +5,7 @@ import {
   NumberFormats,
   QueryFormMetric,
 } from '@superset-ui/core';
+import { getPreset } from '../mocks/presets';
 import {
   KpiCardFormData,
   KpiCardProps,
@@ -192,6 +193,14 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const { width, height, formData: fd, queriesData, theme } = chartProps;
   const formData = fd as KpiCardFormData;
 
+  // ── Normalize groupby fields (sharedControls.groupby stores arrays even with multi:false) ──
+  const groupbyPrimary: string | undefined = Array.isArray(formData.groupbyPrimary)
+    ? (formData.groupbyPrimary[0] as string | undefined)
+    : formData.groupbyPrimary;
+  const groupbySecondary: string | undefined = Array.isArray(formData.groupbySecondary)
+    ? (formData.groupbySecondary[0] as string | undefined)
+    : formData.groupbySecondary;
+
   // ── Defaults (camelCase — auto-converted from controlPanel snake_case) ──
   const autoRussian = formData.autoFormatRussian ?? true;
   const enableComp1 = formData.enableComp1 ?? true;
@@ -254,6 +263,153 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const fmtComp2B = (n: number) => formatRussianSmartEx(n, decimalsComp2B, suffixComp2B);
   const fmtDelta1B = (n: number) => formatRussianDeltaAbsEx(n, decimalsDelta1B, suffixDelta1B);
   const fmtDelta2B = (n: number) => formatRussianDeltaAbsEx(n, decimalsDelta2B, suffixDelta2B);
+
+  // ── Mock mode: early return with preset data (no dependency on real metrics) ──
+  const mockModeEnabled = formData.mockModeEnabled ?? false;
+  if (mockModeEnabled) {
+    const preset = getPreset(formData.mockPreset, formData.mockCustomJson);
+
+    const isDarkMode = (() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bg = (theme as any)?.colorBgContainer as string | undefined;
+      if (!bg || typeof bg !== 'string' || !bg.startsWith('#')) return false;
+      const hex = bg.replace('#', '');
+      if (hex.length < 6) return false;
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return (r * 299 + g * 587 + b * 114) / 1000 < 128;
+    })();
+
+    const mockModeAView = buildModeView({
+      mainValue: preset.mainA,
+      comp1Value: preset.comp1A,
+      comp2Value: preset.comp2A,
+      colorScheme1: colorScheme1A,
+      colorScheme2: colorScheme2A,
+      subtitle: formData.subtitleA || '',
+      enableComp1,
+      enableComp2,
+      comp1Label,
+      comp2Label,
+      deltaValue1: preset.comp1A != null ? preset.mainA - preset.comp1A : null,
+      deltaValue2: preset.comp2A != null ? preset.mainA - preset.comp2A : null,
+      fmtMain: fmtMainA,
+      fmtComp1: fmtComp1A,
+      fmtComp2: fmtComp2A,
+      fmtDelta1: fmtDelta1A,
+      fmtDelta2: fmtDelta2A,
+    });
+
+    const mockModeBView = buildModeView({
+      mainValue: preset.mainB,
+      comp1Value: preset.comp1B,
+      comp2Value: preset.comp2B,
+      colorScheme1: colorScheme1B,
+      colorScheme2: colorScheme2B,
+      subtitle: formData.subtitleB || '',
+      enableComp1,
+      enableComp2,
+      comp1Label,
+      comp2Label,
+      deltaValue1: preset.comp1B != null ? preset.mainB - preset.comp1B : null,
+      deltaValue2: preset.comp2B != null ? preset.mainB - preset.comp2B : null,
+      fmtMain: fmtMainB,
+      fmtComp1: fmtComp1B,
+      fmtComp2: fmtComp2B,
+      fmtDelta1: fmtDelta1B,
+      fmtDelta2: fmtDelta2B,
+    });
+
+    return {
+      width,
+      height,
+      headerText: formData.headerText || preset.label || 'KPI',
+      dataState: 'populated' as DataState,
+      modeCount,
+      toggleLabelA: formData.toggleLabelA || '₽',
+      toggleLabelB: formData.toggleLabelB || '%',
+      modeAView: mockModeAView,
+      modeBView: mockModeBView,
+      colorScheme1A, colorScheme1B, colorScheme2A, colorScheme2B,
+      deltaFormat1A, deltaFormat2A, deltaFormat1B, deltaFormat2B,
+      formatComp1A: fmtComp1A, formatComp2A: fmtComp2A,
+      formatDelta1A: fmtDelta1A, formatDelta2A: fmtDelta2A,
+      formatComp1B: fmtComp1B, formatComp2B: fmtComp2B,
+      formatDelta1B: fmtDelta1B, formatDelta2B: fmtDelta2B,
+      detailColFact, detailColComp1, detailColDelta1, detailColComp2, detailColDelta2,
+      enableComp1, enableComp2, comp1Label, comp2Label,
+      showDelta1, showDelta2,
+      hierarchyLabelPrimary: formData.hierarchyLabelPrimary || 'Магазин',
+      hierarchyLabelSecondary: formData.hierarchyLabelSecondary || 'Сегмент',
+      isDarkMode, theme,
+      detailQueryParams: {
+        datasourceId: 0,
+        datasourceType: 'table',
+        groupbyPrimary: groupbyPrimary || 'centrum_code',
+        groupbySecondary: groupbySecondary || 'category_code',
+        metricsA: [], metricsB: [],
+        metricLabelsA: [], metricLabelsB: [],
+        filters: [], extras: {},
+        metricALabel: '__mock', metricBLabel: '__mock',
+        comp1LabelA: null, comp2LabelA: null,
+        delta1LabelA: null, delta2LabelA: null,
+        comp1LabelB: null, comp2LabelB: null,
+        delta1LabelB: null, delta2LabelB: null,
+      },
+      formatValueA: fmtMainA, formatValueB: fmtMainB, formatDelta,
+      detailTopN: Number(formData.detailTopN) || 0,
+      detailPageSize: Number(formData.detailPageSize) || 5,
+      mockModeEnabled: true,
+      mockPreset: formData.mockPreset ?? 'revenue',
+      mockCustomJson: formData.mockCustomJson,
+    };
+  }
+
+  // ── Guard: no metric configured and mock is off → safe empty state ──
+  if (!formData.metricA) {
+    const isDarkMode = (() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const bg = (theme as any)?.colorBgContainer as string | undefined;
+      if (!bg || typeof bg !== 'string' || !bg.startsWith('#')) return false;
+      const hex = bg.replace('#', '');
+      if (hex.length < 6) return false;
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g2 = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return (r * 299 + g2 * 587 + b * 114) / 1000 < 128;
+    })();
+
+    return {
+      width, height,
+      headerText: formData.headerText || 'KPI',
+      dataState: 'empty' as DataState,
+      modeCount,
+      toggleLabelA: formData.toggleLabelA || '₽',
+      toggleLabelB: formData.toggleLabelB || '%',
+      modeAView: { value: '—', subtitle: '', comparisons: [] },
+      modeBView: { value: '—', subtitle: '', comparisons: [] },
+      colorScheme1A, colorScheme1B, colorScheme2A, colorScheme2B,
+      deltaFormat1A, deltaFormat2A, deltaFormat1B, deltaFormat2B,
+      formatComp1A: fmtComp1A, formatComp2A: fmtComp2A,
+      formatDelta1A: fmtDelta1A, formatDelta2A: fmtDelta2A,
+      formatComp1B: fmtComp1B, formatComp2B: fmtComp2B,
+      formatDelta1B: fmtDelta1B, formatDelta2B: fmtDelta2B,
+      detailColFact, detailColComp1, detailColDelta1, detailColComp2, detailColDelta2,
+      enableComp1, enableComp2, comp1Label, comp2Label,
+      showDelta1, showDelta2,
+      hierarchyLabelPrimary: formData.hierarchyLabelPrimary || 'Магазин',
+      hierarchyLabelSecondary: formData.hierarchyLabelSecondary || 'Сегмент',
+      isDarkMode, theme,
+      detailQueryParams: undefined,
+      formatValueA: fmtMainA, formatValueB: fmtMainB, formatDelta,
+      detailTopN: Number(formData.detailTopN) || 0,
+      detailPageSize: Number(formData.detailPageSize) || 20,
+      mockModeEnabled: false,
+      mockPreset: formData.mockPreset ?? 'revenue',
+      mockCustomJson: formData.mockCustomJson,
+    };
+  }
 
   // ── Summary data (Query 0) ──
   const summaryData = (queriesData?.[0]?.data as Record<string, unknown>[]) ?? [];
@@ -341,7 +497,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     : { value: '', subtitle: '', comparisons: [] };
 
   // ── Detail query params (for lazy loading via SupersetClient) ──
-  const hasGroupby = Boolean(formData.groupbyPrimary);
+  const hasGroupby = Boolean(groupbyPrimary);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const ds = (chartProps as any).datasource;
   const dsId = ds?.id ?? (chartProps as any).datasourceId ?? 0;
@@ -395,8 +551,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     ? {
         datasourceId: dsId,
         datasourceType: dsType,
-        groupbyPrimary: formData.groupbyPrimary,
-        groupbySecondary: formData.groupbySecondary,
+        groupbyPrimary,
+        groupbySecondary,
         metricsA,
         metricsB,
         metricLabelsA: metricsA.map(m => getMetricLabel(m)),
@@ -515,5 +671,10 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     // Top N
     detailTopN: Number(formData.detailTopN) || 0,
     detailPageSize: Number(formData.detailPageSize) || 20,
+
+    // Mock mode
+    mockModeEnabled,
+    mockPreset: formData.mockPreset ?? 'revenue',
+    mockCustomJson: formData.mockCustomJson,
   };
 }

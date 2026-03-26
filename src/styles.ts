@@ -147,6 +147,24 @@ export const Card = styled.div<{ clickable?: boolean }>`
   }
 `;
 
+/** Mock mode badge — matches PartialBadge style (Design System v2.0) */
+export const MockBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: var(--wn-b);
+  color: var(--wn);
+  font-family: var(--f);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.3px;
+  margin-left: 6px;
+  vertical-align: middle;
+  user-select: none;
+`;
+
 /* ── Empty state ── */
 
 export const EmptyStateWrap = styled.div`
