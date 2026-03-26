@@ -109,8 +109,9 @@ const config: ControlPanelConfig = {
     // ── Section 3: Query — Mode A ──
     {
       label: t('Запрос — Режим А'),
-      expanded: false,
+      expanded: true,
       controlSetRows: [
+        ['adhoc_filters'], // DnD validator for columns+metrics → DatasourcePanel shows data
         [
           {
             name: 'metric_a',
