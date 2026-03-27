@@ -387,6 +387,10 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         metricsA: [], metricsB: [],
         metricLabelsA: [], metricLabelsB: [],
         filters: simpleFilters, extras: detailExtras,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        timeRange: ((formData as any).timeRange ?? (formData as any).time_range) as string | undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        granularity: ((formData as any).granularitySqla ?? (formData as any).granularity_sqla) as string | undefined,
         metricALabel: '__mock', metricBLabel: '__mock',
         comp1LabelA: null, comp2LabelA: null,
         delta1LabelA: null, delta2LabelA: null,
@@ -562,8 +566,11 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         metricsB,
         metricLabelsA: metricsA.map(m => getMetricLabel(m)),
         metricLabelsB: metricsB.map(m => getMetricLabel(m)),
-        timeRange: formData.time_range as string | undefined,
-        granularity: formData.granularity_sqla as string | undefined,
+        // camelCase keys (Superset applies lodash camelCase to formData)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        timeRange: ((formData as any).timeRange ?? (formData as any).time_range) as string | undefined,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        granularity: ((formData as any).granularitySqla ?? (formData as any).granularity_sqla) as string | undefined,
         filters: simpleFilters,
         extras: detailExtras,
         metricALabel,
