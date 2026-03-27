@@ -119,6 +119,31 @@ const config: ControlPanelConfig = {
               ...sharedControls.metric,
               label: t('Основная мера'),
               description: t('Основное значение KPI — большое число на карточке'),
+              // Extend parent mapStateToProps to pass isMockMode flag
+              mapStateToProps: (
+                state: { datasource?: unknown; form_data?: Record<string, unknown> },
+                controlState: unknown,
+              ) => {
+                const parentMapper = sharedControls.metric.mapStateToProps;
+                const parent = parentMapper
+                  // @ts-expect-error mapStateToProps overload compat
+                  ? parentMapper(state, controlState)
+                  : {};
+                return {
+                  ...parent,
+                  isMockMode: state?.form_data?.mock_mode_enabled === true,
+                };
+              },
+              // Conditional required: skip when mock mode is on
+              // Pattern: row_limit + maxValue (Superset sharedControls.tsx:226-241)
+              validators: [
+                // @ts-expect-error state extends ControlState with isMockMode from mapStateToProps
+                (v: unknown, state?: { isMockMode?: boolean }) => {
+                  if (state?.isMockMode) return false;
+                  if (!v) return t('Метрика обязательна');
+                  return false;
+                },
+              ],
             },
           },
         ],
