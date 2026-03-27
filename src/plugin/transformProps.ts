@@ -267,7 +267,11 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   // ── Convert adhoc_filters → simple {col, op, val} + freeform SQL ──
   // (must be before mock early return so filters are available for both paths)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adhocFilters = ((formData.adhoc_filters ?? []) as any[]) as Array<Record<string, unknown>>;
+  const adhocFilters = ((
+    // camelCase key (transformProps receives camelCased formData from Superset)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (formData as any).adhocFilters ?? (formData as any).adhoc_filters ?? []
+  ) as any[]) as Array<Record<string, unknown>>;
   const simpleFilters: Array<{ col: string; op: string; val?: unknown }> = [];
   const freeformWhere: string[] = [];
   const freeformHaving: string[] = [];
