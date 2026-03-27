@@ -119,6 +119,14 @@ const config: ControlPanelConfig = {
               ...sharedControls.metric,
               label: t('Основная мера'),
               description: t('Основное значение KPI — большое число на карточке'),
+              // Re-evaluate mapStateToProps when mock_mode_enabled changes
+              // (ControlPanelsContainer calls mapStateToProps only when this returns true)
+              shouldMapStateToProps: (
+                prevState: { form_data?: Record<string, unknown> },
+                nextState: { form_data?: Record<string, unknown> },
+              ) =>
+                prevState?.form_data?.mock_mode_enabled !==
+                nextState?.form_data?.mock_mode_enabled,
               // Extend parent mapStateToProps to pass isMockMode flag
               mapStateToProps: (
                 state: { datasource?: unknown; form_data?: Record<string, unknown> },
