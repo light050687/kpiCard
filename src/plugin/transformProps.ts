@@ -264,6 +264,38 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   const fmtDelta1B = (n: number) => formatRussianDeltaAbsEx(n, decimalsDelta1B, suffixDelta1B);
   const fmtDelta2B = (n: number) => formatRussianDeltaAbsEx(n, decimalsDelta2B, suffixDelta2B);
 
+  // ── Convert adhoc_filters → simple {col, op, val} + freeform SQL ──
+  // (must be before mock early return so filters are available for both paths)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const adhocFilters = ((formData.adhoc_filters ?? []) as any[]) as Array<Record<string, unknown>>;
+  const simpleFilters: Array<{ col: string; op: string; val?: unknown }> = [];
+  const freeformWhere: string[] = [];
+  const freeformHaving: string[] = [];
+
+  for (const f of adhocFilters) {
+    if (f.expressionType === 'SIMPLE') {
+      simpleFilters.push({
+        col: f.subject as string,
+        op: f.operator as string,
+        val: f.comparator,
+      });
+    } else if (f.expressionType === 'SQL') {
+      const sql = `(${f.sqlExpression as string})`;
+      if (f.clause === 'HAVING') freeformHaving.push(sql);
+      else freeformWhere.push(sql);
+    }
+  }
+
+  const detailExtras: Record<string, unknown> = {
+    ...((formData.extras as Record<string, unknown>) ?? {}),
+  };
+  if (freeformWhere.length > 0) {
+    detailExtras.where = freeformWhere.join(' AND ');
+  }
+  if (freeformHaving.length > 0) {
+    detailExtras.having = freeformHaving.join(' AND ');
+  }
+
   // ── Mock mode: early return with preset data (no dependency on real metrics) ──
   const mockModeEnabled = formData.mockModeEnabled ?? false;
   if (mockModeEnabled) {
@@ -350,7 +382,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         groupbySecondary: groupbySecondary || 'category_code',
         metricsA: [], metricsB: [],
         metricLabelsA: [], metricLabelsB: [],
-        filters: [], extras: {},
+        filters: simpleFilters, extras: detailExtras,
         metricALabel: '__mock', metricBLabel: '__mock',
         comp1LabelA: null, comp2LabelA: null,
         delta1LabelA: null, delta2LabelA: null,
@@ -515,37 +547,6 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     ? collectMetrics([formData.metricB, formData.metricPlanB, formData.metricComp2B,
         formData.metricDelta1B, formData.metricDelta2B])
     : [];
-
-  // Convert adhoc_filters → simple {col, op, val} + freeform SQL in extras
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adhocFilters = ((formData.adhoc_filters ?? []) as any[]) as Array<Record<string, unknown>>;
-  const simpleFilters: Array<{ col: string; op: string; val?: unknown }> = [];
-  const freeformWhere: string[] = [];
-  const freeformHaving: string[] = [];
-
-  for (const f of adhocFilters) {
-    if (f.expressionType === 'SIMPLE') {
-      simpleFilters.push({
-        col: f.subject as string,
-        op: f.operator as string,
-        val: f.comparator,
-      });
-    } else if (f.expressionType === 'SQL') {
-      const sql = `(${f.sqlExpression as string})`;
-      if (f.clause === 'HAVING') freeformHaving.push(sql);
-      else freeformWhere.push(sql);
-    }
-  }
-
-  const detailExtras: Record<string, unknown> = {
-    ...((formData.extras as Record<string, unknown>) ?? {}),
-  };
-  if (freeformWhere.length > 0) {
-    detailExtras.where = freeformWhere.join(' AND ');
-  }
-  if (freeformHaving.length > 0) {
-    detailExtras.having = freeformHaving.join(' AND ');
-  }
 
   const detailQueryParams: DetailQueryParams | undefined = hasGroupby
     ? {
