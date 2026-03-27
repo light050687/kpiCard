@@ -209,6 +209,7 @@ const config: ControlPanelConfig = {
       label: t('Запрос — Режим Б'),
       expanded: false,
       controlSetRows: [
+        ['adhoc_filters'],
         [
           {
             name: 'metric_b',
