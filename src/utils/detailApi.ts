@@ -26,6 +26,22 @@ function findMetricByLabel(
   return metrics.find((m) => getMetricLabel(m) === label);
 }
 
+/**
+ * Build HAVING clause that filters zero-metric groups.
+ * Merges with existing HAVING from user-defined adhoc_filters.
+ */
+function buildHavingExtras(
+  baseExtras: Record<string, unknown>,
+  metricLabel: string,
+): Record<string, unknown> {
+  const existingHaving = (baseExtras.having as string | undefined) ?? '';
+  const zeroFilter = `${metricLabel} != 0`;
+  const having = existingHaving
+    ? `${existingHaving} AND ${zeroFilter}`
+    : zeroFilter;
+  return { ...baseExtras, having };
+}
+
 // ═══════════════════════════════════════
 // Sort target resolution
 // ═══════════════════════════════════════
@@ -117,19 +133,7 @@ export function buildGroupsPayload(
     filters.push({ col: searchCol, op, val });
   }
 
-  // Extras with HAVING to filter zero-metric groups (merge with existing)
-  // metricLabel is already an aggregate expression like "SUM(loss_sum)"
-  // so use it directly — no extra SUM() wrapping
-  const baseExtras = queryParams.extras ?? {};
-  const existingHaving = (baseExtras.having as string | undefined) ?? '';
-  const zeroFilter = `${metricLabel} != 0`;
-  const having = existingHaving
-    ? `${existingHaving} AND ${zeroFilter}`
-    : zeroFilter;
-  const extras: Record<string, unknown> = {
-    ...baseExtras,
-    having,
-  };
+  const extras = buildHavingExtras(queryParams.extras ?? {}, metricLabel);
 
   // Resolve orderby: use metric object if sortTarget matches a metric label,
   // otherwise use column name string

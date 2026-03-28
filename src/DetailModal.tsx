@@ -99,8 +99,15 @@ async function exportToCsv(
 
   const rows: string[][] = [];
   for (const group of data) {
+    // Parent summary row (aggregated values for the group)
+    const parentRow = [group.name, '', rawNum(group.summary.rawValue)];
+    if (enableComp1) parentRow.push(rawNum(group.summary.rawComp1), rawNum(group.summary.rawComp1Delta));
+    if (enableComp2) parentRow.push(rawNum(group.summary.rawComp2), rawNum(group.summary.rawComp2Delta));
+    rows.push(parentRow);
+
+    // Child rows
     for (const child of group.children) {
-      const row = [group.name, child.name, rawNum(child.rawValue)];
+      const row = ['', child.name, rawNum(child.rawValue)];
       if (enableComp1) row.push(rawNum(child.rawComp1), rawNum(child.rawComp1Delta));
       if (enableComp2) row.push(rawNum(child.rawComp2), rawNum(child.rawComp2Delta));
       rows.push(row);
@@ -567,7 +574,8 @@ function DetailModalInner({
     // Mock mode: totalCount already set in fetchGroups
     if (mockModeEnabled) return;
 
-    // Don't reset totalCount — keep old pagination visible (stale-while-revalidate)
+    // AbortController prevents setState after unmount
+    const controller = new AbortController();
 
     const countPayload = buildCountPayload({
       queryParams,
@@ -583,15 +591,19 @@ function DetailModalInner({
     SupersetClient.post({
       endpoint: 'api/v1/chart/data',
       jsonPayload: countPayload,
+      signal: controller.signal,
     })
       .then(({ json }: { json: Record<string, unknown> }) => {
         const rows = extractApiRows(json);
         setTotalCount(rows.length);
       })
-      .catch(() => {
-        // Non-critical — UI works without exact count
-        setTotalCount(null);
+      .catch((err: Error) => {
+        if (err.name !== 'AbortError') {
+          setTotalCount(null);
+        }
       });
+
+    return () => controller.abort();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, activeMode, hierarchyMode, debouncedSearch, searchScope, exactMatch, queryParams.datasourceId]);
 
