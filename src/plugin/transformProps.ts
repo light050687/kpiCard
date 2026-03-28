@@ -601,9 +601,12 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   })();
 
   // ── Compute data state (Design System v2.0: 6 mandatory states) ──
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const isCached = Boolean((queriesData?.[0] as any)?.is_cached);
   const dataState: DataState = (() => {
     if (!summaryData.length) return 'empty';
     if (mainValueA === 0 && mainValueB === 0) return 'empty';
+    if (isCached) return 'stale';
     if (modeCount === 'dual' && mainValueA !== 0 && mainValueB === 0) return 'partial';
     return 'populated';
   })();

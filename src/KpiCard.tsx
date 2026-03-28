@@ -32,6 +32,7 @@ import {
   SkeletonBlock,
   SkeletonWrap,
   ErrorStateIcon,
+  RefreshBar,
 } from './styles';
 import DetailModal from './DetailModal';
 
@@ -431,6 +432,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   const isA = activeMode === 'a';
   const isDual = modeCount === 'dual';
   const isPartial = dataState === 'partial';
+  const isStale = dataState === 'stale';
 
   // ── Loading state — skeleton placeholder ──
   if (dataState === 'loading') {
@@ -589,6 +591,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
         clickable={hasDetail}
         onClick={hasDetail ? () => setIsModalOpen(true) : undefined}
       >
+        {isStale && <RefreshBar />}
         <CardHead>
           <CardTitle>{headerText}{mockModeEnabled && <MockBadge>ТЕСТ</MockBadge>}</CardTitle>
           {isPartial && <PartialBadge>Частичные данные</PartialBadge>}
