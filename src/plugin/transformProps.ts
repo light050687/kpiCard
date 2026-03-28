@@ -18,7 +18,6 @@ import {
   SupersetFormDataExtended,
   SupersetThemeExtended,
   DatasourceInfo,
-  QueryResultItem,
 } from '../types';
 import {
   formatRussianSmartEx,
@@ -578,11 +577,9 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   })();
 
   // ── Compute data state (Design System v2.0: 6 mandatory states) ──
-  const isCached = Boolean((queriesData?.[0] as QueryResultItem | undefined)?.is_cached);
   const dataState: DataState = (() => {
     if (!summaryData.length) return 'empty';
     if (mainValueA === 0 && mainValueB === 0) return 'empty';
-    if (isCached) return 'stale';
     if (modeCount === 'dual' && mainValueA !== 0 && mainValueB === 0) return 'partial';
     return 'populated';
   })();
