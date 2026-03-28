@@ -72,8 +72,8 @@ export default function buildQuery(formData: KpiCardFormData) {
 
     // Mock mode: if no real metrics configured, use COUNT(*) to avoid "Empty query?"
     // COUNT(*) is always valid SQL for any datasource. transformProps ignores the result.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isMockOn = (formData as any).mock_mode_enabled ?? (formData as any).mockModeEnabled ?? false;
+    const fdExt = formData as unknown as { mock_mode_enabled?: boolean; mockModeEnabled?: boolean };
+    const isMockOn = fdExt.mock_mode_enabled ?? fdExt.mockModeEnabled ?? false;
     if (allMetrics.length === 0 && isMockOn) {
       allMetrics.push({
         expressionType: 'SQL',

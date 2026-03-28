@@ -2,7 +2,6 @@ import {
   ChartProps,
   getMetricLabel,
   getNumberFormatter,
-  NumberFormats,
   QueryFormMetric,
 } from '@superset-ui/core';
 import { getPreset } from '../mocks/presets';
@@ -16,9 +15,12 @@ import {
   DeltaFormat,
   ComparisonColorScheme,
   DetailQueryParams,
+  SupersetFormDataExtended,
+  SupersetThemeExtended,
+  DatasourceInfo,
+  QueryResultItem,
 } from '../types';
 import {
-  formatRussianSmart,
   formatRussianSmartEx,
   formatRussianPercent,
   formatRussianDeltaAbsEx,
@@ -53,18 +55,6 @@ function extractMetricValue(
 // ═══════════════════════════════════════
 
 type ValueFormatter = (n: number) => string;
-
-// @ts-ignore TS6133 — kept for potential future use with generic format
-function createValueFormatter(
-  formatStr: string | undefined,
-  autoRussian: boolean,
-): ValueFormatter {
-  if (autoRussian && (!formatStr || formatStr === 'RU_SMART')) {
-    return formatRussianSmart;
-  }
-  const d3Fmt = getNumberFormatter(formatStr || NumberFormats.SMART_NUMBER);
-  return (n: number) => d3Fmt(n);
-}
 
 function createDeltaFormatter(autoRussian: boolean): ValueFormatter {
   if (autoRussian) {
@@ -266,12 +256,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
 
   // ── Convert adhoc_filters → simple {col, op, val} + freeform SQL ──
   // (must be before mock early return so filters are available for both paths)
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const adhocFilters = ((
-    // camelCase key (transformProps receives camelCased formData from Superset)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (formData as any).adhocFilters ?? (formData as any).adhoc_filters ?? []
-  ) as any[]) as Array<Record<string, unknown>>;
+  const fdExt = formData as unknown as SupersetFormDataExtended;
+  const adhocFilters = (fdExt.adhocFilters ?? fdExt.adhoc_filters ?? []) as Array<Record<string, unknown>>;
   const simpleFilters: Array<{ col: string; op: string; val?: unknown }> = [];
   const freeformWhere: string[] = [];
   const freeformHaving: string[] = [];
@@ -306,8 +292,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
     const preset = getPreset(formData.mockPreset, formData.mockCustomJson);
 
     const isDarkMode = (() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const bg = (theme as any)?.colorBgContainer as string | undefined;
+      const bg = (theme as unknown as SupersetThemeExtended)?.colorBgContainer;
       if (!bg || typeof bg !== 'string' || !bg.startsWith('#')) return false;
       const hex = bg.replace('#', '');
       if (hex.length < 6) return false;
@@ -387,10 +372,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         metricsA: [], metricsB: [],
         metricLabelsA: [], metricLabelsB: [],
         filters: simpleFilters, extras: detailExtras,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        timeRange: ((formData as any).timeRange ?? (formData as any).time_range) as string | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        granularity: ((formData as any).granularitySqla ?? (formData as any).granularity_sqla) as string | undefined,
+        timeRange: (fdExt.timeRange ?? fdExt.time_range) as string | undefined,
+        granularity: (fdExt.granularitySqla ?? fdExt.granularity_sqla) as string | undefined,
         metricALabel: '__mock', metricBLabel: '__mock',
         comp1LabelA: null, comp2LabelA: null,
         delta1LabelA: null, delta2LabelA: null,
@@ -409,8 +392,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   // ── Guard: no metric configured and mock is off → safe empty state ──
   if (!formData.metricA) {
     const isDarkMode = (() => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const bg = (theme as any)?.colorBgContainer as string | undefined;
+      const bg = (theme as unknown as SupersetThemeExtended)?.colorBgContainer;
       if (!bg || typeof bg !== 'string' || !bg.startsWith('#')) return false;
       const hex = bg.replace('#', '');
       if (hex.length < 6) return false;
@@ -538,9 +520,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
 
   // ── Detail query params (for lazy loading via SupersetClient) ──
   const hasGroupby = Boolean(groupbyPrimary);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ds = (chartProps as any).datasource;
-  const dsId = ds?.id ?? (chartProps as any).datasourceId ?? 0;
+  const ds = (chartProps as unknown as { datasource?: DatasourceInfo; datasourceId?: number }).datasource;
+  const dsId = ds?.id ?? (chartProps as unknown as { datasourceId?: number }).datasourceId ?? 0;
   const dsType = ds?.type ?? 'table';
 
   // Collect all non-null metrics for each mode
@@ -566,11 +547,8 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
         metricsB,
         metricLabelsA: metricsA.map(m => getMetricLabel(m)),
         metricLabelsB: metricsB.map(m => getMetricLabel(m)),
-        // camelCase keys (Superset applies lodash camelCase to formData)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        timeRange: ((formData as any).timeRange ?? (formData as any).time_range) as string | undefined,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        granularity: ((formData as any).granularitySqla ?? (formData as any).granularity_sqla) as string | undefined,
+        timeRange: (fdExt.timeRange ?? fdExt.time_range) as string | undefined,
+        granularity: (fdExt.granularitySqla ?? fdExt.granularity_sqla) as string | undefined,
         filters: simpleFilters,
         extras: detailExtras,
         metricALabel,
@@ -588,8 +566,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
 
   // ── Detect dark mode (mirrors @superset-ui/core isThemeDark via colorBgContainer) ──
   const isDarkMode = (() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const bg = (theme as any)?.colorBgContainer as string | undefined;
+    const bg = (theme as unknown as SupersetThemeExtended)?.colorBgContainer;
     if (!bg || typeof bg !== 'string' || !bg.startsWith('#')) return false;
     const hex = bg.replace('#', '');
     if (hex.length < 6) return false;
@@ -601,8 +578,7 @@ export default function transformProps(chartProps: ChartProps): KpiCardProps {
   })();
 
   // ── Compute data state (Design System v2.0: 6 mandatory states) ──
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isCached = Boolean((queriesData?.[0] as any)?.is_cached);
+  const isCached = Boolean((queriesData?.[0] as QueryResultItem | undefined)?.is_cached);
   const dataState: DataState = (() => {
     if (!summaryData.length) return 'empty';
     if (mainValueA === 0 && mainValueB === 0) return 'empty';

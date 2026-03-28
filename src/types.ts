@@ -1,6 +1,46 @@
 import { QueryFormData, QueryFormMetric, supersetTheme } from '@superset-ui/core';
 
 // ═══════════════════════════════════════
+// Superset Runtime Types (not in @types)
+// ═══════════════════════════════════════
+
+/**
+ * Extended formData with camelCase keys from Superset's lodash conversion.
+ * Superset applies lodash.camelCase to all controlPanel snake_case keys
+ * before passing formData to transformProps.
+ */
+export interface SupersetFormDataExtended {
+  adhocFilters?: Array<Record<string, unknown>>;
+  adhoc_filters?: Array<Record<string, unknown>>;
+  timeRange?: string;
+  time_range?: string;
+  granularitySqla?: string;
+  granularity_sqla?: string;
+  mockModeEnabled?: boolean;
+  mock_mode_enabled?: boolean;
+  [key: string]: unknown;
+}
+
+/** Superset theme extended with Ant Design v5 tokens */
+export interface SupersetThemeExtended {
+  colorBgContainer?: string;
+  [key: string]: unknown;
+}
+
+/** ChartProps.datasource shape (not in @superset-ui/core types) */
+export interface DatasourceInfo {
+  id?: number;
+  type?: string;
+}
+
+/** Single query result item with cache flag */
+export interface QueryResultItem {
+  data?: Record<string, unknown>[];
+  is_cached?: boolean;
+  [key: string]: unknown;
+}
+
+// ═══════════════════════════════════════
 // Enums & Utility Types
 // ═══════════════════════════════════════
 

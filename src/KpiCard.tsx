@@ -393,7 +393,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
           hoverTarget.addEventListener('mouseleave', onLeave);
 
           // Store cleanup refs
-          (el as any).__kpiDotsCleanup = () => {
+          (el as HTMLElement & { __kpiDotsCleanup?: () => void }).__kpiDotsCleanup = () => {
             hoverTarget.removeEventListener('mouseenter', onEnter);
             hoverTarget.removeEventListener('mouseleave', onLeave);
           };
@@ -416,9 +416,11 @@ const KpiCardMemo = React.memo(function KpiCardInner({
 
     return () => {
       // Cleanup event listeners to prevent memory leak
-      if (el && (el as any).__kpiDotsCleanup) {
-        (el as any).__kpiDotsCleanup();
-        delete (el as any).__kpiDotsCleanup;
+      type ElWithCleanup = HTMLElement & { __kpiDotsCleanup?: () => void };
+      const elc = el as ElWithCleanup | null;
+      if (elc?.__kpiDotsCleanup) {
+        elc.__kpiDotsCleanup();
+        elc.__kpiDotsCleanup = undefined;
       }
     };
   }, []);
