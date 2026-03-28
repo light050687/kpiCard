@@ -60,7 +60,7 @@ const config: ControlPanelConfig = {
                 'Выключите когда реальные данные будут готовы.',
               ),
               default: false,
-              // NO renderTrigger — toggle must trigger buildQuery to inject dummy metric
+              renderTrigger: true,
             },
           },
         ],
@@ -97,7 +97,6 @@ const config: ControlPanelConfig = {
                 '"groupCount": 20, "childrenPerGroup": 5}',
               ),
               default: '{}',
-              renderTrigger: true,
               language: 'json',
               visibility: isMockCustom,
             },
@@ -119,39 +118,7 @@ const config: ControlPanelConfig = {
               ...sharedControls.metric,
               label: t('Основная мера'),
               description: t('Основное значение KPI — большое число на карточке'),
-              // Re-evaluate mapStateToProps when mock_mode_enabled changes
-              // (ControlPanelsContainer calls mapStateToProps only when this returns true)
-              shouldMapStateToProps: (
-                prevState: { form_data?: Record<string, unknown> },
-                nextState: { form_data?: Record<string, unknown> },
-              ) =>
-                prevState?.form_data?.mock_mode_enabled !==
-                nextState?.form_data?.mock_mode_enabled,
-              // Extend parent mapStateToProps to pass isMockMode flag
-              mapStateToProps: (
-                state: { datasource?: unknown; form_data?: Record<string, unknown> },
-                controlState: unknown,
-              ) => {
-                const parentMapper = sharedControls.metric.mapStateToProps;
-                const parent = parentMapper
-                  // @ts-expect-error mapStateToProps overload compat
-                  ? parentMapper(state, controlState)
-                  : {};
-                return {
-                  ...parent,
-                  isMockMode: state?.form_data?.mock_mode_enabled === true,
-                };
-              },
-              // Conditional required: skip when mock mode is on
-              // Pattern: row_limit + maxValue (Superset sharedControls.tsx:226-241)
-              validators: [
-                // @ts-expect-error state extends ControlState with isMockMode from mapStateToProps
-                (v: unknown, state?: { isMockMode?: boolean }) => {
-                  if (state?.isMockMode) return false;
-                  if (!v) return t('Метрика обязательна');
-                  return false;
-                },
-              ],
+              validators: [], // validation in transformProps (mock mode needs empty metrics)
             },
           },
         ],
