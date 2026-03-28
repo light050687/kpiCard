@@ -50,6 +50,11 @@ export const KEYFRAMES_CSS = `
   from{opacity:0}
   to{opacity:1}
 }
+@keyframes kpi-skeleton-pulse{
+  0%{opacity:.12}
+  50%{opacity:.22}
+  100%{opacity:.12}
+}
 @keyframes kpi-overlay-in{
   from{opacity:0}
   to{opacity:1}
@@ -195,6 +200,42 @@ export const EmptyStateText = styled.div`
   color: var(--g500);
   text-align: center;
   line-height: 1.4;
+`;
+
+/** Error state icon — red circle with exclamation mark */
+export const ErrorStateIcon = styled.div`
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--dn) 15%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--dn);
+
+  &::after {
+    content: '!';
+  }
+`;
+
+/* ── Loading skeleton ── */
+
+export const SkeletonBlock = styled.div<{ w?: string; h?: number }>`
+  width: ${({ w }) => w || '100%'};
+  height: ${({ h }) => h || 16}px;
+  border-radius: 4px;
+  background: var(--g200);
+  animation: kpi-skeleton-pulse 1.4s ease-in-out infinite;
+`;
+
+export const SkeletonWrap = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+  flex: 1;
 `;
 
 /* ── Partial state badge ── */

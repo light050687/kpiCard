@@ -29,6 +29,9 @@ import {
   EmptyStateText,
   PartialBadge,
   MockBadge,
+  SkeletonBlock,
+  SkeletonWrap,
+  ErrorStateIcon,
 } from './styles';
 import DetailModal from './DetailModal';
 
@@ -428,6 +431,58 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   const isA = activeMode === 'a';
   const isDual = modeCount === 'dual';
   const isPartial = dataState === 'partial';
+
+  // ── Loading state — skeleton placeholder ──
+  if (dataState === 'loading') {
+    return (
+      <KpiCardRoot
+        ref={rootRef}
+        width={width}
+        height={height}
+        data-theme={isDarkMode ? 'dark' : 'light'}
+        role="figure"
+        aria-label={`${headerText}: загрузка`}
+        aria-busy="true"
+      >
+        <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
+        <Card className={CARD_CLASS}>
+          <CardHead>
+            <SkeletonBlock w="120px" h={14} />
+          </CardHead>
+          <SkeletonWrap>
+            <SkeletonBlock w="180px" h={36} />
+            <SkeletonBlock w="100px" h={12} />
+            <SkeletonBlock w="260px" h={14} />
+          </SkeletonWrap>
+        </Card>
+      </KpiCardRoot>
+    );
+  }
+
+  // ── Error state — query or render failure ──
+  if (dataState === 'error') {
+    return (
+      <KpiCardRoot
+        ref={rootRef}
+        width={width}
+        height={height}
+        data-theme={isDarkMode ? 'dark' : 'light'}
+        role="figure"
+        aria-label={`${headerText}: ошибка`}
+      >
+        <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
+        <Card className={CARD_CLASS}>
+          <CardHead>
+            <CardTitle>{headerText}</CardTitle>
+          </CardHead>
+          <EmptyStateWrap>
+            <ErrorStateIcon aria-hidden="true" />
+            <EmptyStateText>Ошибка загрузки данных</EmptyStateText>
+          </EmptyStateWrap>
+        </Card>
+      </KpiCardRoot>
+    );
+  }
 
   // ── Empty state — no data available ──
   if (dataState === 'empty') {
