@@ -691,8 +691,61 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   );
 }, arePropsEqual);
 
+// ── Error Boundary — catches render errors and shows error state ──
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+}
+
+class KpiCardErrorBoundary extends React.Component<
+  KpiCardProps,
+  ErrorBoundaryState
+> {
+  constructor(props: KpiCardProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(): ErrorBoundaryState {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, info: React.ErrorInfo): void {
+    // eslint-disable-next-line no-console
+    console.error('[KPI Card] Render error:', error, info.componentStack);
+  }
+
+  render(): React.ReactNode {
+    if (this.state.hasError) {
+      const { width, height, headerText } = this.props;
+      return (
+        <KpiCardRoot
+          width={width}
+          height={height}
+          data-theme="light"
+          role="figure"
+          aria-label={`${headerText}: ошибка`}
+        >
+          <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
+          <Card className={CARD_CLASS}>
+            <CardHead>
+              <CardTitle>{headerText || 'KPI'}</CardTitle>
+            </CardHead>
+            <EmptyStateWrap>
+              <ErrorStateIcon aria-hidden="true" />
+              <EmptyStateText>Ошибка отображения</EmptyStateText>
+            </EmptyStateWrap>
+          </Card>
+        </KpiCardRoot>
+      );
+    }
+    // @ts-expect-error React.memo type compat with @types/react 17
+    return <KpiCardMemo {...this.props} />;
+  }
+}
+
 // Superset expects a plain FunctionComponent, not MemoExoticComponent.
-// Cast through any to bypass React types version mismatch.
+// ErrorBoundary wraps the memoized component to catch render crashes.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const KpiCard = KpiCardMemo as any as (props: KpiCardProps) => JSX.Element;
+const KpiCard = KpiCardErrorBoundary as any as (props: KpiCardProps) => JSX.Element;
 export default KpiCard;
