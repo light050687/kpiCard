@@ -697,8 +697,8 @@ export const SearchBox = styled.div`
   border-radius: 6px;
   padding: 0 3px 0 12px;
   height: 32px;
-  flex: 1;
-  max-width: 460px;
+  flex: 1 1 auto;
+  min-width: 0;
   transition: border-color 0.15s ${EASE};
 
   &:focus-within {
@@ -707,7 +707,6 @@ export const SearchBox = styled.div`
 
   @media (max-width: 768px) {
     width: 100%;
-    max-width: none;
     order: 1;
   }
 `;
@@ -844,6 +843,8 @@ export const FlipButton = styled.button`
   cursor: pointer;
   transition: all 0.15s ${EASE};
   color: var(--g600);
+  flex-shrink: 0;
+  white-space: nowrap;
 
   &:hover {
     border-color: var(--g300);
