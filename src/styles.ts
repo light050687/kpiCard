@@ -114,6 +114,8 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
   height: 100%;
   box-sizing: border-box;
   overflow: visible;
+  container-type: inline-size;
+  container-name: kpi;
   padding: 0;
   margin: 0;
   display: flex;
@@ -149,6 +151,17 @@ export const Card = styled.div<{ clickable?: boolean }>`
 
   &:hover {
     border-color: var(--g300);
+  }
+
+  @container kpi (max-width: 320px) {
+    padding: 12px 14px;
+  }
+  @container kpi (max-width: 240px) {
+    padding: 10px 12px;
+    border-radius: 8px;
+  }
+  @container kpi (max-width: 180px) {
+    padding: 8px 10px;
   }
 `;
 
@@ -263,6 +276,14 @@ export const CardHead = styled.div`
   align-items: center;
   margin-bottom: 12px;
   min-height: 24px;
+
+  @container kpi (max-width: 320px) {
+    margin-bottom: 8px;
+    min-height: 20px;
+  }
+  @container kpi (max-width: 240px) {
+    margin-bottom: 4px;
+  }
 `;
 
 export const CardTitle = styled.div`
@@ -290,6 +311,14 @@ export const CardTitle = styled.div`
   .kpi-card:hover &::after {
     width: 100%;
   }
+
+  @container kpi (max-width: 320px) {
+    font-size: 12px;
+    letter-spacing: 0.03em;
+  }
+  @container kpi (max-width: 240px) {
+    font-size: 11px;
+  }
 `;
 
 /* ── Toggle ── */
@@ -305,6 +334,10 @@ export const ToggleGroup = styled.div`
   animation-timing-function: ${EASE};
   animation-delay: 0.3s;
   animation-fill-mode: both;
+
+  @container kpi (max-width: 240px) {
+    display: none;
+  }
 `;
 
 export const ToggleButton = styled.button<{ active: boolean }>`
@@ -360,6 +393,17 @@ export const HeroValue = styled.div`
   .kpi-card:hover & {
     color: var(--c-sky);
   }
+
+  @container kpi (max-width: 320px) {
+    font-size: 24px;
+  }
+  @container kpi (max-width: 240px) {
+    font-size: 20px;
+  }
+  @container kpi (max-width: 180px) {
+    font-size: 16px;
+    letter-spacing: -0.01em;
+  }
 `;
 
 export const HeroUnit = styled.span`
@@ -367,6 +411,10 @@ export const HeroUnit = styled.span`
   font-weight: 600;
   margin-left: 2px;
   color: var(--g500);
+
+  @container kpi (max-width: 240px) {
+    font-size: 11px;
+  }
 `;
 
 /* ── Subtitle ── */
@@ -382,6 +430,14 @@ export const Subtitle = styled.div`
   animation-timing-function: ${EASE};
   animation-delay: 0.4s;
   animation-fill-mode: both;
+
+  @container kpi (max-width: 240px) {
+    font-size: 10px;
+    margin-bottom: 8px;
+  }
+  @container kpi (max-width: 180px) {
+    display: none;
+  }
 `;
 
 /* ── Comparisons (horizontal wrap: Plan + YoY side by side) ── */
@@ -412,6 +468,15 @@ export const ComparisonSection = styled.div<{ skipAnimation?: boolean }>`
     animation-timing-function: ${EASE};
     animation-delay: 0.5s;
     animation-fill-mode: both;
+  }
+
+  @container kpi (max-width: 320px) {
+    gap: 8px;
+    padding-top: 8px;
+  }
+  @container kpi (max-width: 240px) {
+    flex-direction: column;
+    gap: 4px;
   }
 `;
 
@@ -479,6 +544,11 @@ export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }
       if (status === 'wn') return HOVER_WN;
       return 'transparent';
     }};
+  }
+
+  @container kpi (max-width: 240px) {
+    font-size: 9px;
+    padding: 2px 6px;
   }
 `;
 
@@ -614,7 +684,7 @@ export const ModalToolbar = styled.div`
   border-bottom: 1px solid var(--g100);
   flex-shrink: 0;
 
-  @media (max-width: 428px) {
+  @media (max-width: 768px) {
     flex-wrap: wrap;
   }
 `;
@@ -635,9 +705,10 @@ export const SearchBox = styled.div`
     border-color: var(--g300);
   }
 
-  @media (max-width: 428px) {
+  @media (max-width: 768px) {
     width: 100%;
     max-width: none;
+    order: 1;
   }
 `;
 
@@ -784,9 +855,10 @@ export const FlipButton = styled.button`
     outline-offset: 2px;
   }
 
-  @media (max-width: 428px) {
+  @media (max-width: 768px) {
     width: 100%;
     justify-content: center;
+    order: 10;
   }
 `;
 
@@ -811,6 +883,10 @@ export const ResultsCount = styled.span`
   font-size: 11px;
   color: var(--g500);
   font-variant-numeric: tabular-nums;
+
+  @media (max-width: 768px) {
+    order: 11;
+  }
 `;
 
 /* ── Pagination ── */
