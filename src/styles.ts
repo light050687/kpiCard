@@ -577,8 +577,8 @@ export const Modal = styled.div<{ closing?: boolean }>`
   background: var(--s);
   border: 1px solid var(--g200);
   border-radius: 10px;
-  /* Fluid width: 320px minimum, 92% of viewport, 960px maximum — no breakpoint jumps */
-  width: clamp(320px, 92vw, 960px);
+  /* Fluid width: 320px min, 92% of viewport, 1200px max — smooth on every pixel */
+  width: clamp(320px, 92vw, 1200px);
   max-height: clamp(260px, 88vh, 85vh);
   min-height: 260px;
   display: flex;
