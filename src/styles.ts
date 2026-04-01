@@ -683,10 +683,7 @@ export const ModalToolbar = styled.div`
   padding: 10px 20px;
   border-bottom: 1px solid var(--g100);
   flex-shrink: 0;
-
-  @media (max-width: 768px) {
-    flex-wrap: wrap;
-  }
+  flex-wrap: wrap;
 `;
 
 export const SearchBox = styled.div`
@@ -697,17 +694,12 @@ export const SearchBox = styled.div`
   border-radius: 6px;
   padding: 0 3px 0 12px;
   height: 32px;
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 1 1 280px;
+  min-width: 200px;
   transition: border-color 0.15s ${EASE};
 
   &:focus-within {
     border-color: var(--g300);
-  }
-
-  @media (max-width: 768px) {
-    width: 100%;
-    order: 1;
   }
 `;
 
@@ -855,12 +847,6 @@ export const FlipButton = styled.button`
     outline: 2px solid var(--c-sky);
     outline-offset: 2px;
   }
-
-  @media (max-width: 768px) {
-    width: 100%;
-    justify-content: center;
-    order: 10;
-  }
 `;
 
 export const FlipIcon = styled.span<{ flipped?: boolean }>`
@@ -884,10 +870,8 @@ export const ResultsCount = styled.span`
   font-size: 11px;
   color: var(--g500);
   font-variant-numeric: tabular-nums;
-
-  @media (max-width: 768px) {
-    order: 11;
-  }
+  white-space: nowrap;
+  flex-shrink: 0;
 `;
 
 /* ── Pagination ── */
