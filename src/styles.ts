@@ -139,7 +139,6 @@ export const Card = styled.div<{ clickable?: boolean }>`
   overflow: hidden;
   position: relative;
   width: 100%;
-  flex: 1;
   display: flex;
   flex-direction: column;
   cursor: ${({ clickable }) => (clickable ? 'pointer' : 'default')};
