@@ -577,11 +577,10 @@ export const Modal = styled.div<{ closing?: boolean }>`
   background: var(--s);
   border: 1px solid var(--g200);
   border-radius: 10px;
-  width: 92%;
-  max-width: 960px;
-  min-width: 600px;
-  max-height: 85vh;
-  min-height: 300px;
+  /* Fluid width: 320px minimum, 92% of viewport, 960px maximum — no breakpoint jumps */
+  width: clamp(320px, 92vw, 960px);
+  max-height: clamp(260px, 88vh, 85vh);
+  min-height: 260px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -590,27 +589,7 @@ export const Modal = styled.div<{ closing?: boolean }>`
   opacity: ${({ closing }) => (closing ? 0 : 1)};
   transition: transform 0.3s ${EASE}, opacity 0.3s ${EASE};
 
-  /* Desktop small */
-  @media (max-width: 1024px) {
-    max-width: 800px;
-    min-width: 500px;
-  }
-
-  /* Tablet */
-  @media (max-width: 768px) {
-    width: 96%;
-    max-width: 700px;
-    min-width: 380px;
-    max-height: 88vh;
-  }
-
-  /* Mobile */
-  @media (max-width: 428px) {
-    width: 98%;
-    max-width: none;
-    min-width: 320px;
-    max-height: 92vh;
-    min-height: 260px;
+  @media (max-width: 380px) {
     border-radius: 8px;
   }
 `;
