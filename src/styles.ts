@@ -335,8 +335,11 @@ export const ToggleGroup = styled.div`
   animation-delay: 0.3s;
   animation-fill-mode: both;
 
+  flex-shrink: 0;
+
   @container kpi (max-width: 240px) {
-    display: none;
+    padding: 1px;
+    gap: 1px;
   }
 `;
 
@@ -359,6 +362,11 @@ export const ToggleButton = styled.button<{ active: boolean }>`
 
   &:hover {
     color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g600)')};
+  }
+
+  @container kpi (max-width: 240px) {
+    padding: 3px 6px;
+    font-size: 10px;
   }
 `;
 
