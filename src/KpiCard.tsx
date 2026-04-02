@@ -400,15 +400,30 @@ const KpiCardMemo = React.memo(function KpiCardInner({
         }
       }
 
-      // Dashboard chart wrapper
+      // Dashboard chart wrapper — stretch to fill holder height
       const dashChart = chartSlice.querySelector('.dashboard-chart') as HTMLElement | null;
       if (dashChart) {
         dashChart.style.overflow = 'visible';
         dashChart.style.background = 'transparent';
+        dashChart.style.height = '100%';
+      }
+
+      // chart-container + slice_container + inner wrappers — full height chain
+      const chartContainer = chartSlice.querySelector('.chart-container') as HTMLElement | null;
+      if (chartContainer) {
+        chartContainer.style.height = '100%';
+        // Traverse inner divs to ensure height propagates to KpiCardRoot
+        let inner: HTMLElement | null = chartContainer;
+        for (let depth = 0; depth < 4; depth++) {
+          const child = inner.querySelector(':scope > div') as HTMLElement | null;
+          if (!child) break;
+          child.style.height = '100%';
+          inner = child;
+        }
       }
     }
 
-    // Parent holder — transparent, no padding so card touches grid border
+    // Parent holder — transparent, no padding, full height for card alignment
     const holder = el.closest('.dashboard-component-chart-holder') as HTMLElement | null;
     if (holder) {
       holder.style.cssText += ';background:transparent!important;box-shadow:none!important;overflow:visible!important;padding:0!important;';
