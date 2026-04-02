@@ -448,6 +448,7 @@ export const ComparisonSection = styled.div<{ skipAnimation?: boolean }>`
   flex-wrap: wrap;
   padding-top: 10px;
   position: relative;
+  margin-top: auto;
   animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-cmp-in'};
   animation-duration: 0.5s;
   animation-timing-function: ${EASE};
