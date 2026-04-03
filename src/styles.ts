@@ -136,7 +136,7 @@ export const Card = styled.div<{ clickable?: boolean }>`
   border: 1px solid var(--g200);
   border-radius: 10px;
   padding: 16px 20px;
-  overflow: visible;
+  overflow: hidden;
   position: relative;
   width: 100%;
   flex: 1;
@@ -504,6 +504,7 @@ export const ComparisonLabel = styled.span`
   text-transform: uppercase;
   color: var(--g600);
   white-space: nowrap;
+
 `;
 
 export const ComparisonValue = styled.span`
