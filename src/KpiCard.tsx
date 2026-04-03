@@ -273,6 +273,11 @@ const KpiCardMemo = React.memo(function KpiCardInner({
           overflow: visible !important;
         }
 
+        /* Hide filter indicator badge — not needed on KPI cards */
+        div[data-test-viz-type="ext-kpi-card"] .filter-counts {
+          display: none !important;
+        }
+
         /*
          * SliceHeader: height:0 + overflow:visible.
          * Superset measures headerHeight via offsetHeight which returns 0.
