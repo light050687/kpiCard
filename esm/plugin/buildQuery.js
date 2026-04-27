@@ -8,7 +8,23 @@ import { buildQueryContext } from '@superset-ui/core';
  *   - Query 1 (detail):  grouped breakdown for drill-down modal
  */
 export default function buildQuery(formData) {
-    const { metric_a, metric_plan_a, metric_comp2_a, metric_b, metric_plan_b, metric_comp2_b, groupby_primary, groupby_secondary, } = formData;
+    const { metric_a, metric_plan_a, metric_comp2_a, metric_b, metric_plan_b, metric_comp2_b, metric_delta_1a, metric_delta_2a, metric_delta_1b, metric_delta_2b, } = formData;
+    // Normalize groupby fields — sharedControls.groupby stores arrays even with multi:false
+    // buildQueryContext may call .toLowerCase() on these → crash if array
+    const fd = formData;
+    if (Array.isArray(fd.groupby_primary)) {
+        fd.groupby_primary = fd.groupby_primary[0] ?? undefined;
+    }
+    if (Array.isArray(fd.groupby_secondary)) {
+        fd.groupby_secondary = fd.groupby_secondary[0] ?? undefined;
+    }
+    // Also normalize the camelCase variants (lodash auto-converts snake_case → camelCase)
+    if (Array.isArray(fd.groupbyPrimary)) {
+        fd.groupbyPrimary = fd.groupbyPrimary[0] ?? undefined;
+    }
+    if (Array.isArray(fd.groupbySecondary)) {
+        fd.groupbySecondary = fd.groupbySecondary[0] ?? undefined;
+    }
     return buildQueryContext(formData, baseQueryObject => {
         // ── Collect all metrics from both modes, deduplicate ──
         const allMetrics = [];
@@ -30,6 +46,22 @@ export default function buildQuery(formData) {
         addMetric(metric_b);
         addMetric(metric_plan_b);
         addMetric(metric_comp2_b);
+        // Delta metrics (optional — user-provided delta values)
+        addMetric(metric_delta_1a);
+        addMetric(metric_delta_2a);
+        addMetric(metric_delta_1b);
+        addMetric(metric_delta_2b);
+        // Mock mode: if no real metrics configured, use COUNT(*) to avoid "Empty query?"
+        // COUNT(*) is always valid SQL for any datasource. transformProps ignores the result.
+        const fdExt = formData;
+        const isMockOn = fdExt.mock_mode_enabled ?? fdExt.mockModeEnabled ?? false;
+        if (allMetrics.length === 0 && isMockOn) {
+            allMetrics.push({
+                expressionType: 'SQL',
+                sqlExpression: 'COUNT(*)',
+                label: '__mock',
+            });
+        }
         // Pick only safe fields from baseQueryObject to avoid column pollution
         const { time_range, since, until, granularity, filters, extras, applied_time_extras, where, having, annotation_layers, url_params, custom_params, } = baseQueryObject;
         const baseFields = {
@@ -55,20 +87,8 @@ export default function buildQuery(formData) {
             row_limit: 1,
             post_processing: [],
         };
-        // ── Query 1: Detail breakdown (only if groupby columns are set) ──
-        const detailGroupby = [groupby_primary, groupby_secondary].filter((col) => typeof col === 'string' && col.length > 0);
-        if (detailGroupby.length === 0) {
-            return [summaryQuery];
-        }
-        const detailQuery = {
-            ...baseFields,
-            metrics: allMetrics,
-            columns: detailGroupby,
-            orderby: [],
-            row_limit: 10000,
-            post_processing: [],
-        };
-        return [summaryQuery, detailQuery];
+        // Detail data loaded on-demand via SupersetClient when modal opens
+        return [summaryQuery];
     });
 }
 //# sourceMappingURL=buildQuery.js.map

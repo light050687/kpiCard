@@ -16,10 +16,10 @@ import { LIGHT_TOKENS as L, DARK_TOKENS as D, FONTS } from './themeTokens';
 /** Standard easing — matches mockup's --ease token */
 const EASE = 'cubic-bezier(0.4, 0, 0.2, 1)';
 
-/** Hover-state pill backgrounds (stronger opacity than default --up-b/--dn-b/--wn-b) */
-const HOVER_UP = 'rgba(22, 163, 74, 0.15)';
-const HOVER_DN = 'rgba(220, 38, 38, 0.15)';
-const HOVER_WN = 'rgba(204, 182, 4, 0.15)';
+/** Hover-state pill backgrounds — color-mix берёт цвет из токена, чтобы тема переключалась автоматически (DS v2.0: запрет hardcoded hex/rgba) */
+const HOVER_UP = 'color-mix(in srgb, var(--up) 15%, transparent)';
+const HOVER_DN = 'color-mix(in srgb, var(--dn) 15%, transparent)';
+const HOVER_WN = 'color-mix(in srgb, var(--wn) 15%, transparent)';
 
 export const CARD_CLASS = 'kpi-card';
 
@@ -124,9 +124,17 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
   font-family: var(--f);
   -webkit-font-smoothing: antialiased;
 
-  /* prefers-reduced-motion intentionally omitted —
-     animations are core to this visualization's UX.
-     If needed, re-enable per WCAG 2.3.3 (Motion from Interaction). */
+  /* DS v2.0 / WCAG 2.3.3: prefers-reduced-motion отключает все анимации */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      animation-delay: 0ms !important;
+    }
+  }
 `;
 
 /* ── Card ── */
@@ -153,19 +161,22 @@ export const Card = styled.div<{ clickable?: boolean }>`
     border-color: var(--g300);
   }
 
+  @container kpi (max-width: 400px) {
+    padding: 14px 12px;
+  }
   @container kpi (max-width: 320px) {
-    padding: 12px 14px;
+    padding: 12px 10px;
   }
   @container kpi (max-width: 240px) {
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: 10px 8px;
+    border-radius: 10px;
   }
   @container kpi (max-width: 180px) {
-    padding: 8px 10px;
+    padding: 8px 6px;
   }
 `;
 
-/** Mock mode badge — matches PartialBadge style (Design System v2.0) */
+/** Mock mode badge — matches DS 2.0 "Статусный бейдж": моно, 10px / 14px, 600 */
 export const MockBadge = styled.span`
   display: inline-flex;
   align-items: center;
@@ -173,11 +184,12 @@ export const MockBadge = styled.span`
   border-radius: 6px;
   background: var(--wn-b);
   color: var(--wn);
-  font-family: var(--f);
-  font-size: 11px;
+  font-family: var(--m);
+  font-size: 10px;
   font-weight: 600;
-  line-height: 16px;
-  letter-spacing: 0.3px;
+  line-height: 14px;
+  letter-spacing: normal;
+  text-transform: uppercase;
   margin-left: 6px;
   vertical-align: middle;
   user-select: none;
@@ -208,6 +220,7 @@ export const EmptyStateIcon = styled.div`
 `;
 
 export const EmptyStateText = styled.div`
+  /* DS v2.0: empty-state текст 13px --g500 */
   font-family: var(--f);
   font-size: 13px;
   color: var(--g500);
@@ -238,7 +251,7 @@ export const ErrorStateIcon = styled.div`
 export const SkeletonBlock = styled.div<{ w?: string; h?: number }>`
   width: ${({ w }) => w || '100%'};
   height: ${({ h }) => h || 16}px;
-  border-radius: 4px;
+  border-radius: 6px;
   background: var(--g200);
   animation: kpi-skeleton-pulse 1.4s ease-in-out infinite;
 `;
@@ -261,10 +274,11 @@ export const PartialBadge = styled.div`
   border-radius: 6px;
   background: var(--wn-b);
   color: var(--wn);
-  font-family: var(--f);
-  font-size: 11px;
+  font-family: var(--m);
+  font-size: 10px;
   font-weight: 600;
-  line-height: 16px;
+  line-height: 14px;
+  text-transform: uppercase;
   margin-left: auto;
 `;
 
@@ -312,12 +326,10 @@ export const CardTitle = styled.div`
     width: 100%;
   }
 
-  @container kpi (max-width: 320px) {
-    font-size: 12px;
-    letter-spacing: 0.03em;
-  }
-  @container kpi (max-width: 240px) {
-    font-size: 11px;
+  /* DS v2.0 «Заголовок секции»: минимум 13px (mobile ≤428px) */
+  @container kpi (max-width: 428px) {
+    font-size: 13px;
+    line-height: 17px;
   }
 `;
 
@@ -353,20 +365,13 @@ export const ToggleButton = styled.button<{ active: boolean }>`
   text-transform: uppercase;
   color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g400)')};
   padding: 4px 10px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ${EASE};
   line-height: 1;
-  box-shadow: ${({ active }) =>
-    active ? '0 1px 3px rgba(0, 0, 0, 0.06)' : 'none'};
 
   &:hover {
     color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g600)')};
-  }
-
-  @container kpi (max-width: 240px) {
-    padding: 3px 6px;
-    font-size: 10px;
   }
 `;
 
@@ -402,15 +407,15 @@ export const HeroValue = styled.div`
     color: var(--c-sky);
   }
 
-  @container kpi (max-width: 320px) {
+  /* DS v2.0 адаптив hero: 28 / 26 / 24 / 22 (минимум 22px) */
+  @container kpi (max-width: 1024px) {
+    font-size: 26px;
+  }
+  @container kpi (max-width: 768px) {
     font-size: 24px;
   }
-  @container kpi (max-width: 240px) {
-    font-size: 20px;
-  }
-  @container kpi (max-width: 180px) {
-    font-size: 16px;
-    letter-spacing: -0.01em;
+  @container kpi (max-width: 428px) {
+    font-size: 22px;
   }
 `;
 
@@ -420,8 +425,8 @@ export const HeroUnit = styled.span`
   margin-left: 2px;
   color: var(--g500);
 
-  @container kpi (max-width: 240px) {
-    font-size: 11px;
+  @container kpi (max-width: 428px) {
+    font-size: 12px;
   }
 `;
 
@@ -430,6 +435,7 @@ export const HeroUnit = styled.span`
 export const Subtitle = styled.div`
   font-family: var(--m);
   font-size: 11px;
+  font-weight: 400;
   line-height: 16px;
   color: var(--g600);
   margin-bottom: 14px;
@@ -439,12 +445,11 @@ export const Subtitle = styled.div`
   animation-delay: 0.4s;
   animation-fill-mode: both;
 
-  @container kpi (max-width: 240px) {
+  /* DS v2.0: минимум 10px моно, не скрывать (несёт период/метаданные) */
+  @container kpi (max-width: 428px) {
     font-size: 10px;
+    line-height: 14px;
     margin-bottom: 8px;
-  }
-  @container kpi (max-width: 180px) {
-    display: none;
   }
 `;
 
@@ -479,9 +484,13 @@ export const ComparisonSection = styled.div<{ skipAnimation?: boolean }>`
     animation-fill-mode: both;
   }
 
-  @container kpi (max-width: 320px) {
-    gap: 8px;
+  @container kpi (max-width: 400px) {
+    gap: 6px;
     padding-top: 8px;
+  }
+  @container kpi (max-width: 320px) {
+    gap: 4px;
+    padding-top: 6px;
   }
   @container kpi (max-width: 240px) {
     flex-direction: column;
@@ -521,10 +530,10 @@ export const ComparisonValue = styled.span`
 
 export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }>`
   font-family: var(--m);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   white-space: nowrap;
   animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-pill-pop'};
   animation-duration: 0.45s;
@@ -556,8 +565,9 @@ export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }
     }};
   }
 
-  @container kpi (max-width: 240px) {
-    font-size: 9px;
+  /* DS v2.0: жёсткий минимум 10px (не уходим в 9px) */
+  @container kpi (max-width: 428px) {
+    font-size: 10px;
     padding: 2px 6px;
   }
 `;
@@ -566,14 +576,14 @@ export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }
    Detail Modal — drill-down overlay with hierarchical table
    ══════════════════════════════════════════════════════════ */
 
-/** Backdrop overlay — renders via portal to document.body */
+/** Backdrop overlay — renders via portal to document.body. DS v2.0: scrim из общего токена `--glass-scrim` (0.40 light / 0.55 dark) */
 export const Overlay = styled.div<{ closing?: boolean }>`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(10, 10, 10, 0.45);
+  background: var(--glass-scrim, rgba(0, 0, 0, 0.4));
   z-index: 100;
   display: flex;
   align-items: center;
@@ -600,7 +610,7 @@ export const Modal = styled.div<{ closing?: boolean }>`
   transition: transform 0.3s ${EASE}, opacity 0.3s ${EASE};
 
   @media (max-width: 380px) {
-    border-radius: 8px;
+    border-radius: 10px;
   }
 `;
 
@@ -639,8 +649,9 @@ export const ModalValue = styled.span`
 
 export const CloseButton = styled.button`
   margin-left: auto;
-  width: 32px;
-  height: 32px;
+  /* DS v2.0: touch target 40×40 desktop / 48×48 mobile */
+  width: 40px;
+  height: 40px;
   border: 1px solid var(--g200);
   border-radius: 6px;
   background: transparent;
@@ -662,6 +673,11 @@ export const CloseButton = styled.button`
     outline: 2px solid var(--c-sky);
     outline-offset: 2px;
   }
+
+  @media (max-width: 768px) {
+    width: 48px;
+    height: 48px;
+  }
 `;
 
 /** Toolbar with search, mode toggles, hierarchy flip */
@@ -681,7 +697,8 @@ export const SearchBox = styled.div`
   gap: 6px;
   border: 1px solid var(--g200);
   border-radius: 6px;
-  padding: 0 3px 0 12px;
+  /* padding-right убран — SearchScopeToggle прижат к правому краю как часть поиска */
+  padding: 0 2px 0 12px;
   height: 32px;
   flex: 1 1 280px;
   min-width: 200px;
@@ -713,7 +730,7 @@ export const SearchInput = styled.input`
   }
 `;
 
-/** Segmented toggle for search scope — sits inside SearchBox */
+/** Segmented toggle for search scope — sits inside SearchBox, прижат к правому краю */
 export const SearchScopeToggle = styled.div`
   display: flex;
   gap: 2px;
@@ -721,7 +738,6 @@ export const SearchScopeToggle = styled.div`
   border-radius: 6px;
   padding: 2px;
   flex-shrink: 0;
-  margin-left: 4px;
 `;
 
 export const SearchScopeButton = styled.button<{ active: boolean }>`
@@ -734,13 +750,11 @@ export const SearchScopeButton = styled.button<{ active: boolean }>`
   text-transform: uppercase;
   color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g500)')};
   padding: 4px 10px;
-  border-radius: 5px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ${EASE};
   line-height: 1;
   white-space: nowrap;
-  box-shadow: ${({ active }) =>
-    active ? '0 1px 3px rgba(0, 0, 0, 0.06)' : 'none'};
 
   &:hover {
     color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g600)')};
@@ -789,7 +803,7 @@ export const ModeToggle = styled.div`
   display: flex;
   gap: 1px;
   background: var(--g100);
-  border-radius: 5px;
+  border-radius: 6px;
   padding: 2px;
   flex-shrink: 0;
 `;
@@ -798,18 +812,16 @@ export const ModeButton = styled.button<{ active: boolean }>`
   border: none;
   background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
   font-family: var(--m);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g500)')};
   padding: 3px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.12s ${EASE};
   line-height: 1;
-  box-shadow: ${({ active }) =>
-    active ? '0 1px 2px rgba(0, 0, 0, 0.05)' : 'none'};
 `;
 
 export const FlipButton = styled.button`
@@ -878,9 +890,10 @@ export const PaginationWrap = styled.div`
 `;
 
 export const PageBtn = styled.button<{ isActive?: boolean }>`
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
+  /* DS v2.0: touch target 40×40 desktop / 48×48 mobile */
+  min-width: 40px;
+  height: 40px;
+  padding: 0 10px;
   border: none;
   border-radius: 6px;
   font-family: var(--m);
@@ -889,7 +902,7 @@ export const PageBtn = styled.button<{ isActive?: boolean }>`
   cursor: pointer;
   transition: background 0.15s;
   background: ${({ isActive }) => (isActive ? 'var(--c-sky)' : 'transparent')};
-  color: ${({ isActive }) => (isActive ? '#fff' : 'var(--g600)')};
+  color: ${({ isActive }) => (isActive ? 'var(--s)' : 'var(--g600)')};
 
   &:hover {
     background: ${({ isActive }) => (isActive ? 'var(--c-sky)' : 'var(--g100)')};
@@ -897,6 +910,10 @@ export const PageBtn = styled.button<{ isActive?: boolean }>`
   &:focus-visible {
     outline: 2px solid var(--c-sky);
     outline-offset: 2px;
+  }
+  @media (max-width: 768px) {
+    min-width: 48px;
+    height: 48px;
   }
 `;
 
@@ -999,7 +1016,7 @@ export const GroupRow = styled.tr`
 
   & > td {
     font-family: var(--f);
-    font-size: 13px;
+    font-size: 14px;
     line-height: 20px;
     padding: 12px 12px;
     font-weight: 600;
@@ -1011,7 +1028,7 @@ export const GroupRow = styled.tr`
   & > td.r {
     text-align: right;
     font-family: var(--m);
-    font-size: 12px;
+    font-size: 14px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1019,11 +1036,11 @@ export const GroupRow = styled.tr`
   @media (max-width: 428px) {
     & > td {
       padding: 8px 8px;
-      font-size: 12px;
+      font-size: 13px;
       line-height: 18px;
     }
     & > td.r {
-      font-size: 11px;
+      font-size: 13px;
     }
   }
 `;
@@ -1037,7 +1054,7 @@ export const ChildRow = styled.tr`
 
   & > td {
     font-family: var(--f);
-    font-size: 12px;
+    font-size: 13px;
     line-height: 20px;
     padding: 12px 12px;
     color: var(--g600);
@@ -1053,7 +1070,7 @@ export const ChildRow = styled.tr`
   & > td.r {
     text-align: right;
     font-family: var(--m);
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1061,14 +1078,14 @@ export const ChildRow = styled.tr`
   @media (max-width: 428px) {
     & > td {
       padding: 8px 8px;
-      font-size: 11px;
+      font-size: 12px;
       line-height: 18px;
     }
     & > td:first-of-type {
       padding-left: 28px;
     }
     & > td.r {
-      font-size: 11px;
+      font-size: 12px;
     }
   }
 `;
@@ -1098,10 +1115,10 @@ export const EmptyRow = styled.tr`
 /** Small delta pill for table cells */
 export const TablePill = styled.span<{ status: string }>`
   font-family: var(--m);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 600;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 6px;
   white-space: nowrap;
 
   color: ${({ status }) => {
@@ -1185,7 +1202,7 @@ export const RefreshBar = styled.div`
     display: block;
     width: 40%;
     height: 100%;
-    background: var(--c-sky, #3B8BD9);
+    background: var(--c-sky);
     animation: kpi-refresh-slide 1.2s ease-in-out infinite;
   }
 
@@ -1193,4 +1210,76 @@ export const RefreshBar = styled.div`
     0% { transform: translateX(-100%); }
     100% { transform: translateX(350%); }
   }
+`;
+
+/* DetailModal helpers — extracted from inline styles per DS v2.0 */
+
+/* Inline spinner (small) — used inside row cells */
+export const InlineSpinnerSmall = styled.span`
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border: 1.5px solid var(--g200);
+  border-top-color: var(--c-sky);
+  border-radius: 50%;
+  animation: kpi-spin 0.7s linear infinite;
+`;
+
+/* Spinner (large) — empty-row loader */
+export const InlineSpinnerLarge = styled.span`
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--g200);
+  border-top-color: var(--c-sky);
+  border-radius: 50%;
+  animation: kpi-spin 0.7s linear infinite;
+`;
+
+/* Centered loader row (icon + caption) */
+export const LoaderRowInner = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+`;
+
+/* Vertical error stack with retry button */
+export const ErrorRowInner = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--dn);
+`;
+
+export const RetryButton = styled.button`
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--g300);
+  background: var(--s);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--f);
+  color: var(--ink);
+
+  &:hover:not(:disabled) {
+    background: var(--g100);
+  }
+  &:focus-visible {
+    outline: 2px solid var(--c-sky);
+    outline-offset: 2px;
+  }
+`;
+
+/* Sortable column header — width is dynamic, keeps cursor:pointer */
+export const SortableTh = styled.th<{ widthPx: number }>`
+  width: ${({ widthPx }) => widthPx}px;
+  cursor: pointer;
+`;
+
+/* Footer-hint inline icon helper */
+export const FooterHintIcon = styled.svg`
+  vertical-align: middle;
 `;

@@ -54,22 +54,23 @@ export default {
   },
   parameters: {
     backgrounds: {
-      default: 'light',
+      default: 'design-system',
       values: [
-        { name: 'light', value: '#F3F3F3' },
-        { name: 'dark', value: '#0F1114' },
+        // Источник правды — CSS-переменные DS v2.0 (--bg light/dark
+        // переключается через :root в head_custom_extra.html / темизацию).
+        { name: 'design-system', value: 'var(--bg)' },
       ],
     },
   },
   decorators: [
     (Story: React.ComponentType) => (
-      <>
+      <div style={{ background: 'var(--bg)', minHeight: '100vh' }}>
         <link
           href="https://fonts.googleapis.com/css2?family=Manrope:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
         <Story />
-      </>
+      </div>
     ),
   ],
 };
@@ -261,7 +262,6 @@ export const Revenue = {
 /** Revenue card — dark theme */
 export const RevenueDark = {
   args: { ...Revenue.args, isDarkMode: true },
-  parameters: { backgrounds: { default: 'dark' } },
 };
 
 /** Revenue card — single mode (no toggle) */
@@ -331,7 +331,8 @@ function KpiGrid({
   hierarchyLabelPrimary,
   hierarchyLabelSecondary,
 }: KpiGridOverrides) {
-  const bg = isDarkMode ? '#0F1114' : '#F3F3F3';
+  // Цвет фона — из DS v2.0 через CSS-переменную `--bg`
+  // (light/dark переключается на уровне :root, не в Storybook).
   const detail = withDetail ? { detailDataRaw: MOCK_DETAIL_RAW } : {};
 
   // "Расходы" inverts color scheme: growth in expenses is bad
@@ -385,7 +386,7 @@ function KpiGrid({
     <>
       {/* eslint-disable-next-line react/no-danger */}
       <style dangerouslySetInnerHTML={{ __html: GRID_CSS }} />
-      <div className="kpi-grid" style={{ background: bg }}>
+      <div className="kpi-grid" style={{ background: 'var(--bg)' }}>
         {cards.map(card => (
           <KpiCard key={card.headerText} width={280} height={170} theme={STUB_THEME} {...card} />
         ))}
@@ -414,27 +415,27 @@ const GRID_ARGS: KpiGridOverrides = {
 export const GridLight = {
   args: { ...GRID_ARGS },
   render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
-  parameters: { backgrounds: { default: 'light' }, layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen' },
 };
 
 export const GridDark = {
   args: { ...GRID_ARGS, isDarkMode: true },
   render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
-  parameters: { backgrounds: { default: 'dark' }, layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen' },
 };
 
 /** Grid with detail — click any card to open drill-down modal */
 export const GridWithDetailLight = {
   args: { ...GRID_ARGS, withDetail: true },
   render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
-  parameters: { backgrounds: { default: 'light' }, layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen' },
 };
 
 /** Grid with detail — dark theme */
 export const GridWithDetailDark = {
   args: { ...GRID_ARGS, isDarkMode: true, withDetail: true },
   render: (args: KpiGridOverrides) => <KpiGrid {...args} />,
-  parameters: { backgrounds: { default: 'dark' }, layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen' },
 };
 
 /** Revenue card with detail drill-down — click to open modal */
@@ -453,7 +454,6 @@ export const RevenueWithDetailDark = {
     isDarkMode: true,
     detailDataRaw: MOCK_DETAIL_RAW,
   },
-  parameters: { backgrounds: { default: 'dark' } },
 };
 
 // ═══════════════════════════════════════
@@ -479,7 +479,6 @@ export const EmptyState = {
 /** Empty state — dark theme */
 export const EmptyStateDark = {
   args: { ...EmptyState.args, isDarkMode: true },
-  parameters: { backgrounds: { default: 'dark' } },
 };
 
 /** Partial state — Mode A has data, Mode B is zero */

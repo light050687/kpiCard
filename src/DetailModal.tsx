@@ -60,6 +60,13 @@ import {
   FooterHint,
   ExportButton,
   RefreshBar,
+  InlineSpinnerSmall,
+  InlineSpinnerLarge,
+  LoaderRowInner,
+  ErrorRowInner,
+  RetryButton,
+  SortableTh,
+  FooterHintIcon,
 } from './styles';
 
 const CLOSE_DURATION_MS = 200;
@@ -199,16 +206,7 @@ function GroupRowView({
     <GroupRow onClick={onToggle}>
       <td>
         {isLoadingChildren ? (
-          <span
-            style={{
-              display: 'inline-block', width: 10, height: 10, marginRight: 6,
-              border: '1.5px solid var(--g200, #e5e5e5)',
-              borderTopColor: 'var(--c-sky, #3B8BD9)',
-              borderRadius: '50%',
-              animation: 'kpi-spin 0.7s linear infinite',
-            }}
-            aria-label="Загрузка"
-          />
+          <InlineSpinnerSmall aria-label="Загрузка" />
         ) : (
           <Chevron expanded={expanded} aria-hidden="true">▶</Chevron>
         )}
@@ -974,31 +972,31 @@ function DetailModalInner({
           <DetailTable>
             <THead>
               <THRow>
-                <th style={{ width: nameWidth, cursor: 'pointer' }} onClick={() => handleSort('name')}>
+                <SortableTh widthPx={nameWidth} onClick={() => handleSort('name')}>
                   {groupLabel}{sortIcon('name')}
-                </th>
-                <th className="r" style={{ width: valWidth, cursor: 'pointer' }} onClick={() => handleSort('value')}>
+                </SortableTh>
+                <SortableTh className="r" widthPx={valWidth} onClick={() => handleSort('value')}>
                   {colFact}{sortIcon('value')}
-                </th>
+                </SortableTh>
                 {enableComp1 && (
-                  <th className="r" style={{ width: valWidth, cursor: 'pointer' }} onClick={() => handleSort('comp1Value')}>
+                  <SortableTh className="r" widthPx={valWidth} onClick={() => handleSort('comp1Value')}>
                     {comp1Header}{sortIcon('comp1Value')}
-                  </th>
+                  </SortableTh>
                 )}
                 {enableComp1 && showDelta1 && (
-                  <th className="r" style={{ width: deltaWidth, cursor: 'pointer' }} onClick={() => handleSort('comp1Delta')}>
+                  <SortableTh className="r" widthPx={deltaWidth} onClick={() => handleSort('comp1Delta')}>
                     {delta1Header}{sortIcon('comp1Delta')}
-                  </th>
+                  </SortableTh>
                 )}
                 {enableComp2 && (
-                  <th className="r" style={{ width: valWidth, cursor: 'pointer' }} onClick={() => handleSort('comp2Value')}>
+                  <SortableTh className="r" widthPx={valWidth} onClick={() => handleSort('comp2Value')}>
                     {comp2Header}{sortIcon('comp2Value')}
-                  </th>
+                  </SortableTh>
                 )}
                 {enableComp2 && showDelta2 && (
-                  <th className="r" style={{ width: deltaWidth, cursor: 'pointer' }} onClick={() => handleSort('comp2Delta')}>
+                  <SortableTh className="r" widthPx={deltaWidth} onClick={() => handleSort('comp2Delta')}>
                     {delta2Header}{sortIcon('comp2Delta')}
-                  </th>
+                  </SortableTh>
                 )}
               </THRow>
             </THead>
@@ -1011,32 +1009,25 @@ function DetailModalInner({
               {isInitialLoading ? (
                 <EmptyRow>
                   <td colSpan={colCount}>
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-                      <span style={{
-                        display: 'inline-block', width: 16, height: 16,
-                        border: '2px solid var(--g200, #e5e5e5)',
-                        borderTopColor: 'var(--c-sky, #3B8BD9)',
-                        borderRadius: '50%',
-                        animation: 'kpi-spin 0.7s linear infinite',
-                      }} />
+                    <LoaderRowInner>
+                      <InlineSpinnerLarge />
                       Загрузка…
-                    </div>
+                    </LoaderRowInner>
                     <style>{`@keyframes kpi-spin{to{transform:rotate(360deg)}}`}</style>
                   </td>
                 </EmptyRow>
               ) : fetchError ? (
                 <EmptyRow>
                   <td colSpan={colCount}>
-                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, color: 'var(--dn, #DC2626)' }}>
+                    <ErrorRowInner>
                       <span>{fetchError}</span>
-                      <button
+                      <RetryButton
                         type="button"
                         onClick={() => { setFetchError(null); setCurrentPage(p => p); }}
-                        style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid var(--g300)', background: 'var(--s)', cursor: 'pointer', fontSize: 12 }}
                       >
                         Повторить
-                      </button>
-                    </div>
+                      </RetryButton>
+                    </ErrorRowInner>
                   </td>
                 </EmptyRow>
               ) : groups.length === 0 ? (
@@ -1152,7 +1143,7 @@ function DetailModalInner({
         {/* ── Footer ── */}
         <ModalFoot>
           <FooterHint>
-            ▶ раскрыть детализацию&ensp;·&ensp;<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{verticalAlign: 'middle'}}><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></svg> экспорт          </FooterHint>
+            ▶ раскрыть детализацию&ensp;·&ensp;<FooterHintIcon width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M2 2h8.5L13 4.5V14H2V2z" /><path d="M4 2v4h6V2" /><path d="M9 3v2" /><path d="M4 9h6v5H4z" /></FooterHintIcon> экспорт          </FooterHint>
           <ExportButton
             onClick={handleExport}
             aria-label="Экспорт данных в CSV"

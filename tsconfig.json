@@ -4,7 +4,10 @@
     "outDir": "lib",
     "rootDir": "src",
     "target": "es2020",
-    "lib": ["dom", "es2020"],
+    "lib": [
+      "dom",
+      "es2020"
+    ],
     "module": "esnext",
     "moduleResolution": "node",
     "declaration": true,
@@ -17,6 +20,17 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "lib", "esm", "test"]
+  "include": [
+    "src/**/*",
+    "types/**/*.d.ts"
+  ],
+  "exclude": [
+    "**/*.stories.*",
+    "**/*.test.*",
+    "**/__tests__/**",
+    "esm",
+    "lib",
+    "node_modules",
+    "test"
+  ]
 }

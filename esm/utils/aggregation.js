@@ -8,39 +8,15 @@
  * produces DIFFERENT aggregated values than "secondary → primary"
  * (e.g., average per segment ≠ average per store).
  */
-import { formatRussianPercent, formatRussianPP, formatDeltaByFormat } from './formatRussian';
+import { formatDeltaByFormat } from './formatRussian';
 // ═══════════════════════════════════════
-// Core aggregation functions
+// NOTE: aggregateValues / aggregateNullable removed —
+// aggregation now happens server-side via GROUP BY + SUM.
 // ═══════════════════════════════════════
-function aggregateValues(values, type) {
-    if (values.length === 0)
-        return 0;
-    switch (type) {
-        case 'SUM':
-            return values.reduce((a, b) => a + b, 0);
-        case 'AVERAGE':
-            return values.reduce((a, b) => a + b, 0) / values.length;
-        case 'PERCENT':
-            // Weighted average for percentages
-            return values.reduce((a, b) => a + b, 0) / values.length;
-        case 'MAX':
-            return Math.max(...values);
-        case 'MIN':
-            return Math.min(...values);
-        default:
-            return values.reduce((a, b) => a + b, 0);
-    }
-}
-function aggregateNullable(values, type) {
-    const nonNull = values.filter((v) => v != null);
-    if (nonNull.length === 0)
-        return null;
-    return aggregateValues(nonNull, type);
-}
 // ═══════════════════════════════════════
 // Delta & status computation
 // ═══════════════════════════════════════
-function getDeltaStatus(delta, colorScheme) {
+export function getDeltaStatus(delta, colorScheme) {
     if (delta === 0)
         return 'neutral';
     const isPositive = delta > 0;
@@ -50,7 +26,7 @@ function getDeltaStatus(delta, colorScheme) {
     // green_down: positive delta is bad (e.g., expenses grew)
     return isPositive ? 'dn' : 'up';
 }
-function computeDelta(current, reference, isPercentMode, deltaFormat, defaultFormatDelta) {
+export function computeDelta(current, reference, isPercentMode, deltaFormat, defaultFormatDelta) {
     const diff = current - reference;
     if (deltaFormat !== 'auto') {
         // Custom format — use formatDeltaByFormat directly
@@ -72,121 +48,45 @@ function computeDelta(current, reference, isPercentMode, deltaFormat, defaultFor
 // ═══════════════════════════════════════
 // Row formatting
 // ═══════════════════════════════════════
-function formatRow(name, metric, comp1, comp2, isPercentMode, formatValue, defaultFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2) {
+export function formatRow(name, metric, comp1, comp2, isPercentMode, formatValue, defaultFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2, fmtComp1, fmtComp2, fmtDelta1, fmtDelta2, showDelta1 = true, showDelta2 = true, delta1Raw = null, delta2Raw = null) {
     const row = {
         name,
         value: formatValue(metric),
     };
     if (enableComp1 && comp1 != null) {
-        const d = computeDelta(metric, comp1, isPercentMode, deltaFormat1, defaultFormatDelta);
-        row.comp1Value = formatValue(comp1);
-        row.comp1Delta = d.formatted;
-        row.comp1Status = getDeltaStatus(d.status_value, colorScheme1);
+        row.comp1Value = fmtComp1 ? fmtComp1(comp1) : formatValue(comp1);
+        if (showDelta1) {
+            if (delta1Raw != null) {
+                // User-provided delta from SQL — use directly
+                row.comp1Delta = fmtDelta1 ? fmtDelta1(delta1Raw) : String(delta1Raw);
+                row.comp1Status = getDeltaStatus(delta1Raw, colorScheme1);
+            }
+            else {
+                const d = computeDelta(metric, comp1, isPercentMode, deltaFormat1, defaultFormatDelta);
+                row.comp1Delta = fmtDelta1 ? fmtDelta1(d.status_value) : d.formatted;
+                row.comp1Status = getDeltaStatus(d.status_value, colorScheme1);
+            }
+        }
     }
     if (enableComp2 && comp2 != null) {
-        const d = computeDelta(metric, comp2, isPercentMode, deltaFormat2, defaultFormatDelta);
-        row.comp2Value = formatValue(comp2);
-        row.comp2Delta = d.formatted;
-        row.comp2Status = getDeltaStatus(d.status_value, colorScheme2);
+        row.comp2Value = fmtComp2 ? fmtComp2(comp2) : formatValue(comp2);
+        if (showDelta2) {
+            if (delta2Raw != null) {
+                row.comp2Delta = fmtDelta2 ? fmtDelta2(delta2Raw) : String(delta2Raw);
+                row.comp2Status = getDeltaStatus(delta2Raw, colorScheme2);
+            }
+            else {
+                const d = computeDelta(metric, comp2, isPercentMode, deltaFormat2, defaultFormatDelta);
+                row.comp2Delta = fmtDelta2 ? fmtDelta2(d.status_value) : d.formatted;
+                row.comp2Status = getDeltaStatus(d.status_value, colorScheme2);
+            }
+        }
     }
     return row;
 }
-/**
- * Aggregate raw detail rows into hierarchical groups.
- *
- * Groups by `groupByField`, children by `childField`.
- * Summary values are computed using `aggregationType`.
- *
- * When topN > 0, only the top N groups (by metric value desc) are returned.
- */
-export function aggregateDetailData(opts) {
-    const { rows, groupByField, childField, aggregationType, topN, formatValue, formatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2, } = opts;
-    const isPercentMode = aggregationType === 'PERCENT';
-    // ── PERCENT mode: compute metric/comp1 ratio per row ──
-    // Each row becomes its metricValue/comp1Value ratio (0..1+).
-    // Delta is in percentage points (п.п.).
-    let processedRows = rows;
-    let effectiveAggType = aggregationType;
-    let effectiveFormatValue = formatValue;
-    let effectiveFormatDelta = formatDelta;
-    if (isPercentMode) {
-        processedRows = rows.map(r => ({
-            ...r,
-            // metric / comp1 ratio (e.g. 1.06 = 106%)
-            metricValue: r.comp1Value != null && r.comp1Value !== 0
-                ? r.metricValue / r.comp1Value
-                : 0,
-            // ПЛАН / ПЛАН = 1 (100% — baseline)
-            comp1Value: r.comp1Value != null ? 1 : null,
-            // ФАКТ / comp2 ratio
-            comp2Value: r.comp2Value != null && r.comp2Value !== 0
-                ? r.metricValue / r.comp2Value
-                : null,
-        }));
-        // Average the ratios within a group (weighted avg not needed — already ratios)
-        effectiveAggType = 'AVERAGE';
-        // Format as "106,2%" instead of "892 млн"
-        effectiveFormatValue = (n) => formatRussianPercent(n, false);
-        // Delta in percentage points: "+6,2 п.п."
-        effectiveFormatDelta = (n) => formatRussianPP(n);
-    }
-    // 1. Group rows by parent field
-    const grouped = new Map();
-    for (const row of processedRows) {
-        const key = row[groupByField];
-        const existing = grouped.get(key);
-        if (existing) {
-            existing.push(row);
-        }
-        else {
-            grouped.set(key, [row]);
-        }
-    }
-    // 2. Build DetailGroup for each parent
-    const result = [];
-    for (const [groupName, groupRows] of grouped) {
-        // Build children (aggregate by child field within this group)
-        const childMap = new Map();
-        for (const row of groupRows) {
-            const childKey = row[childField];
-            const existing = childMap.get(childKey);
-            if (existing) {
-                existing.push(row);
-            }
-            else {
-                childMap.set(childKey, [row]);
-            }
-        }
-        const children = [];
-        for (const [childName, childRows] of childMap) {
-            const m = aggregateValues(childRows.map(r => r.metricValue), effectiveAggType);
-            const p = aggregateNullable(childRows.map(r => r.comp1Value), effectiveAggType);
-            const pr = aggregateNullable(childRows.map(r => r.comp2Value), effectiveAggType);
-            children.push(formatRow(childName, m, p, pr, isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2));
-        }
-        // Sort children by metric value descending (approximate by parsing)
-        children.sort((a, b) => {
-            // Use original numeric values for sorting
-            const aIdx = [...childMap.keys()].indexOf(a.name);
-            const bIdx = [...childMap.keys()].indexOf(b.name);
-            const aVal = aggregateValues((childMap.get([...childMap.keys()][aIdx] ?? '') ?? []).map(r => r.metricValue), effectiveAggType);
-            const bVal = aggregateValues((childMap.get([...childMap.keys()][bIdx] ?? '') ?? []).map(r => r.metricValue), effectiveAggType);
-            return bVal - aVal;
-        });
-        // Group summary
-        const summaryMetric = aggregateValues(groupRows.map(r => r.metricValue), effectiveAggType);
-        const summaryComp1 = aggregateNullable(groupRows.map(r => r.comp1Value), effectiveAggType);
-        const summaryComp2 = aggregateNullable(groupRows.map(r => r.comp2Value), effectiveAggType);
-        const summary = formatRow(groupName, summaryMetric, summaryComp1, summaryComp2, isPercentMode, effectiveFormatValue, effectiveFormatDelta, colorScheme1, colorScheme2, enableComp1, enableComp2, deltaFormat1, deltaFormat2);
-        result.push({ group: { name: groupName, summary, children }, rawMetric: summaryMetric });
-    }
-    // 3. Sort groups by metric value descending
-    result.sort((a, b) => b.rawMetric - a.rawMetric);
-    // 4. Apply TOP N
-    const groups = result.map(r => r.group);
-    if (topN > 0) {
-        return groups.slice(0, topN);
-    }
-    return groups;
-}
+// ═══════════════════════════════════════
+// NOTE: aggregateDetailData removed — aggregation
+// now happens server-side. See utils/detailApi.ts
+// for formatServerRow() which uses formatRow/getDeltaStatus/computeDelta.
+// ═══════════════════════════════════════
 //# sourceMappingURL=aggregation.js.map

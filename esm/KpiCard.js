@@ -1,7 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
-import { useState, useEffect, useRef } from 'react';
-import { formatRussianPercent, formatDeltaByFormat, } from './utils/formatRussian';
-import { CARD_CLASS, KEYFRAMES_CSS, KpiCardRoot, Card, CardHead, CardTitle, ToggleGroup, ToggleButton, DataContainer, DataLayer, HeroValue, Subtitle, ComparisonSection, ComparisonItem, ComparisonLabel, ComparisonValue, DeltaPill, } from './styles';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { CARD_CLASS, KEYFRAMES_CSS, KpiCardRoot, Card, CardHead, CardTitle, ToggleGroup, ToggleButton, DataContainer, DataLayer, HeroValue, Subtitle, ComparisonSection, ComparisonItem, ComparisonLabel, ComparisonValue, DeltaPill, EmptyStateWrap, EmptyStateIcon, EmptyStateText, PartialBadge, MockBadge, SkeletonBlock, SkeletonWrap, ErrorStateIcon, RefreshBar, } from './styles';
 import DetailModal from './DetailModal';
 /* ── Counter animation ──────────────────────────────────────────────
  * The integer part of the hero value counts up from 0 → target.
@@ -12,7 +11,8 @@ function easeOutQuart(t) {
     return 1 - (1 - t) ** 4;
 }
 function counterDuration(target) {
-    return Math.min(1200, 700 + target * 30);
+    // DS v2.0: максимум анимации 0.6s (раздел 08, "Переходы и анимации")
+    return Math.min(600, 350 + target * 15);
 }
 function parseHeroInt(value) {
     const m = value.match(/^(.*?)(\d+)([\s\S]*)$/);
@@ -47,12 +47,16 @@ function useCountUp(target, duration, delay) {
     }, [target, duration, delay]);
     return current;
 }
-function AnimatedHero({ value }) {
+function AnimatedHero({ value, skipAnimation }) {
     const parsed = parseHeroInt(value);
     const target = parsed?.num ?? 0;
-    const dur = counterDuration(target);
-    const count = useCountUp(target, dur, COUNTER_DELAY_MS);
+    const dur = skipAnimation ? 0 : counterDuration(target);
+    const count = useCountUp(target, dur, skipAnimation ? 0 : COUNTER_DELAY_MS);
     if (!parsed || target === 0) {
+        return _jsx(HeroValue, { children: value });
+    }
+    // When animation is skipped, show target directly
+    if (skipAnimation) {
         return _jsx(HeroValue, { children: value });
     }
     return (_jsxs(HeroValue, { children: [parsed.prefix, count, parsed.suffix] }));
@@ -70,15 +74,218 @@ function ComparisonRow({ item, skipAnimation, }) {
     return (_jsxs(ComparisonItem, { children: [_jsx(ComparisonLabel, { children: item.label }), _jsx(ComparisonValue, { children: item.value }), _jsx(DeltaPill, { status: item.status, skipAnimation: skipAnimation, children: item.delta })] }));
 }
 function ViewContent({ view, skipAnimation, }) {
-    return (_jsxs(_Fragment, { children: [_jsx(AnimatedHero, { value: view.value }), view.subtitle && _jsx(Subtitle, { children: view.subtitle }), view.comparisons.length > 0 && (_jsx(ComparisonSection, { skipAnimation: skipAnimation, children: view.comparisons.map((cmp, i) => (_jsx(ComparisonRow, { item: cmp, skipAnimation: skipAnimation }, `${cmp.label}-${i}`))) }))] }));
+    return (_jsxs(_Fragment, { children: [_jsx(AnimatedHero, { value: view.value, skipAnimation: skipAnimation }), view.subtitle && _jsx(Subtitle, { children: view.subtitle }), view.comparisons.length > 0 && (_jsx(ComparisonSection, { skipAnimation: skipAnimation, children: view.comparisons.map((cmp, i) => (_jsx(ComparisonRow, { item: cmp, skipAnimation: skipAnimation }, `${cmp.label}-${i}`))) }))] }));
 }
 /* ── Main component ────────────────────────────────────────────── */
-export default function KpiCard({ width, height, headerText, modeCount, toggleLabelA, toggleLabelB, modeAView, modeBView, colorScheme1A, colorScheme1B, colorScheme2A, colorScheme2B, deltaFormat1A, deltaFormat2A, deltaFormat1B, deltaFormat2B, enableComp1, enableComp2, comp1Label, comp2Label, hierarchyLabelPrimary, hierarchyLabelSecondary, isDarkMode, detailDataRaw, 
+/**
+ * Shallow compare for React.memo — skip function props (formatters)
+ * which are recreated on every transformProps call.
+ * This prevents Superset's framework from triggering full re-renders.
+ */
+function arePropsEqual(prev, next) {
+    // Compare all non-function props
+    const keys = Object.keys(next);
+    for (const key of keys) {
+        if (typeof next[key] === 'function')
+            continue; // skip formatters
+        if (key === 'theme')
+            continue; // theme object changes reference often
+        if (prev[key] !== next[key])
+            return false;
+    }
+    return true;
+}
+const KpiCardMemo = React.memo(function KpiCardInner({ width, height, headerText, dataState, modeCount, toggleLabelA, toggleLabelB, modeAView, modeBView, colorScheme1A, colorScheme1B, colorScheme2A, colorScheme2B, deltaFormat1A, deltaFormat2A, deltaFormat1B, deltaFormat2B, formatComp1A, formatComp2A, formatDelta1A, formatDelta2A, formatComp1B, formatComp2B, formatDelta1B, formatDelta2B, detailColFact, detailColComp1, detailColDelta1, detailColComp2, detailColDelta2, enableComp1, enableComp2, comp1Label, comp2Label, showDelta1, showDelta2, hierarchyLabelPrimary, hierarchyLabelSecondary, isDarkMode, detailQueryParams, 
 // aggregationType removed — always SUM-based logic
-formatValueA, formatValueB, formatDelta, detailTopN, }) {
+formatValueA, formatValueB, formatDelta, detailTopN, detailPageSize, mockModeEnabled, mockPreset, mockCustomJson, }) {
     const [activeMode, setActiveMode] = useState('a');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [hasAnimated, setHasAnimated] = useState(false);
+    const rootRef = useRef(null);
+    // ── Hide Superset dashboard chart wrapper (title, background, shadow) ──
+    // Keep the three-dot menu (⋮) accessible but hide title text and wrapper chrome
+    useEffect(() => {
+        const el = rootRef.current;
+        if (!el)
+            return;
+        // Inject global CSS once for all KPI Card instances
+        const STYLE_ID = 'kpi-card-superset-wrapper-reset';
+        if (!document.getElementById(STYLE_ID)) {
+            const style = document.createElement('style');
+            style.id = STYLE_ID;
+            style.textContent = `
+        /* ── KPI Card: seamless dashboard integration ── */
+
+        /* Remove background/shadow from ALL possible wrapper layers */
+        div[data-test-viz-type="ext-kpi-card"],
+        div[data-test-viz-type="ext-kpi-card"] .chart-container,
+        div[data-test-viz-type="ext-kpi-card"] .dashboard-chart,
+        div[data-test-viz-type="ext-kpi-card"] .chart-slice {
+          background: transparent !important;
+          box-shadow: none !important;
+          border: none !important;
+          overflow: visible !important;
+        }
+
+        /* Hide filter indicator badge — not needed on KPI cards */
+        div[data-test-viz-type="ext-kpi-card"] .filter-counts {
+          display: none !important;
+        }
+
+        /*
+         * SliceHeader: height:0 + overflow:visible.
+         * Superset measures headerHeight via offsetHeight which returns 0.
+         * Dots button floats out via overflow:visible + position:absolute.
+         */
+        div[data-test-viz-type="ext-kpi-card"].chart-slice > div:first-child {
+          height: 0 !important;
+          min-height: 0 !important;
+          max-height: 0 !important;
+          padding: 0 !important;
+          margin: 0 !important;
+          border: none !important;
+          overflow: visible !important;
+          pointer-events: none !important;
+        }
+
+        /* chart-slice (SliceContainer): fill holder */
+        div[data-test-viz-type="ext-kpi-card"].chart-slice {
+          position: relative !important;
+          overflow: visible !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+
+        /* dashboard-chart wrapper: no extra spacing */
+        div[data-test-viz-type="ext-kpi-card"] .dashboard-chart {
+          overflow: visible !important;
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+
+        /* Parent holder — transparent, no padding so card touches grid border */
+        .dashboard-component-chart-holder:has(div[data-test-viz-type="ext-kpi-card"]),
+        [data-test="dashboard-component-chart-holder"]:has(div[data-test-viz-type="ext-kpi-card"]) {
+          background: transparent !important;
+          box-shadow: none !important;
+          overflow: visible !important;
+          padding: 0 !important;
+        }
+
+        /* Ensure chart fills container edge-to-edge */
+        div[data-test-viz-type="ext-kpi-card"] .slice-container {
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        div[data-test-viz-type="ext-kpi-card"] .superset-legacy-chart,
+        div[data-test-viz-type="ext-kpi-card"] .chart-container > div {
+          width: 100% !important;
+          height: 100% !important;
+        }
+      `;
+            document.head.appendChild(style);
+        }
+        // Fallback: direct DOM manipulation for browsers without :has()
+        const chartSlice = el.closest('.chart-slice');
+        if (chartSlice) {
+            chartSlice.style.position = 'relative';
+            chartSlice.style.overflow = 'visible';
+            chartSlice.style.background = 'transparent';
+            chartSlice.style.boxShadow = 'none';
+            chartSlice.style.border = 'none';
+            chartSlice.style.padding = '0';
+            chartSlice.style.margin = '0';
+            // SliceHeader: find dots button FIRST (before hiding), then hide.
+            const header = chartSlice.querySelector(':scope > div:first-child');
+            if (header) {
+                // Find dots button BEFORE hiding
+                const dotsBtn = header.querySelector('.ant-dropdown-trigger');
+                // Hide header title but keep it in DOM flow at height 0
+                // so React events still work on the dots button
+                header.style.cssText = [
+                    'height: 0 !important',
+                    'min-height: 0 !important',
+                    'max-height: 0 !important',
+                    'padding: 0 !important',
+                    'margin: 0 !important',
+                    'border: none !important',
+                    'overflow: visible !important',
+                    'background: transparent !important',
+                    'position: relative !important',
+                    'pointer-events: none !important',
+                ].join(';');
+                // Hide all children
+                Array.from(header.children).forEach(child => {
+                    child.style.cssText = 'visibility:hidden!important;pointer-events:none!important;height:0!important;overflow:hidden!important;';
+                });
+                // Show ONLY the dots button, positioned over our card
+                if (dotsBtn) {
+                    const controlsDiv = dotsBtn.closest('.header-controls');
+                    if (controlsDiv) {
+                        controlsDiv.style.cssText = [
+                            'visibility: visible !important',
+                            'pointer-events: auto !important',
+                            'position: absolute !important',
+                            'top: 6px !important',
+                            'right: -6px !important',
+                            'z-index: 100 !important',
+                            'height: auto !important',
+                            'overflow: visible !important',
+                            'opacity: 0',
+                            'transition: opacity 0.15s ease',
+                        ].join(';');
+                    }
+                    dotsBtn.style.cssText += ';visibility:visible!important;pointer-events:auto!important;';
+                    // Show dots on hover — listen on chart-slice (parent of both header and card)
+                    // so mouse moving from card to dots doesn't trigger mouseleave
+                    const hoverTarget = chartSlice || el;
+                    const target = controlsDiv || dotsBtn;
+                    const onEnter = () => { target.style.opacity = '1'; };
+                    const onLeave = () => { target.style.opacity = '0'; };
+                    hoverTarget.addEventListener('mouseenter', onEnter);
+                    hoverTarget.addEventListener('mouseleave', onLeave);
+                    // Store cleanup refs
+                    el.__kpiDotsCleanup = () => {
+                        hoverTarget.removeEventListener('mouseenter', onEnter);
+                        hoverTarget.removeEventListener('mouseleave', onLeave);
+                    };
+                }
+            }
+            // Dashboard chart wrapper — stretch to fill holder height
+            const dashChart = chartSlice.querySelector('.dashboard-chart');
+            if (dashChart) {
+                dashChart.style.overflow = 'visible';
+                dashChart.style.background = 'transparent';
+                dashChart.style.height = '100%';
+            }
+            // chart-container + slice_container + inner wrappers — full height chain
+            const chartContainer = chartSlice.querySelector('.chart-container');
+            if (chartContainer) {
+                chartContainer.style.height = '100%';
+                // Traverse inner divs to ensure height propagates to KpiCardRoot
+                let inner = chartContainer;
+                for (let depth = 0; depth < 4; depth++) {
+                    const child = inner.querySelector(':scope > div');
+                    if (!child)
+                        break;
+                    child.style.height = '100%';
+                    inner = child;
+                }
+            }
+        }
+        // Parent holder — transparent, no padding, full height for card alignment
+        const holder = el.closest('.dashboard-component-chart-holder');
+        if (holder) {
+            holder.style.cssText += ';background:transparent!important;box-shadow:none!important;overflow:visible!important;padding:0!important;';
+        }
+        return () => {
+            const elc = el;
+            if (elc?.__kpiDotsCleanup) {
+                elc.__kpiDotsCleanup();
+                elc.__kpiDotsCleanup = undefined;
+            }
+        };
+    }, []);
     // Disable entrance animations after initial render completes
     useEffect(() => {
         const timer = window.setTimeout(() => setHasAnimated(true), 1200);
@@ -86,105 +293,23 @@ formatValueA, formatValueB, formatDelta, detailTopN, }) {
     }, []);
     const isA = activeMode === 'a';
     const isDual = modeCount === 'dual';
-    const rawRows = detailDataRaw?.rows;
-    // Resolve 'auto' delta format by aggregationType
-    const resolveAutoFmt = (fmt, aggType) => fmt === 'auto'
-        ? aggType === 'PERCENT'
-            ? 'pp'
-            : aggType === 'SUM'
-                ? 'absolute'
-                : 'percent'
-        : fmt;
-    // Recompute hero + comparisons from raw data when aggregation != SUM
-    const recomputeFromRaw = (aggType, fmtValue, baseView, deltaFmt1, deltaFmt2) => {
-        if (aggType === 'SUM' || !rawRows?.length)
-            return null;
-        // Group by primaryGroup for aggregation
-        const groups = new Map();
-        for (const r of rawRows) {
-            const existing = groups.get(r.primaryGroup);
-            if (existing) {
-                existing.metric += r.metricValue;
-                existing.comp1 += r.comp1Value ?? 0;
-                existing.comp2 += r.comp2Value ?? 0;
-            }
-            else {
-                groups.set(r.primaryGroup, {
-                    metric: r.metricValue,
-                    comp1: r.comp1Value ?? 0,
-                    comp2: r.comp2Value ?? 0,
-                });
-            }
-        }
-        const total = rawRows.reduce((s, r) => s + r.metricValue, 0);
-        const totalComp1 = rawRows.reduce((s, r) => s + (r.comp1Value ?? 0), 0);
-        const totalComp2 = rawRows.reduce((s, r) => s + (r.comp2Value ?? 0), 0);
-        const hasComp1 = rawRows.some(r => r.comp1Value != null);
-        const hasComp2 = rawRows.some(r => r.comp2Value != null);
-        const vals = [...groups.values()];
-        let heroNum;
-        let comp1Num;
-        let comp2Num;
-        switch (aggType) {
-            case 'AVERAGE':
-                heroNum = total / groups.size;
-                comp1Num = totalComp1 / groups.size;
-                comp2Num = totalComp2 / groups.size;
-                break;
-            case 'MAX':
-                heroNum = Math.max(...vals.map(v => v.metric));
-                comp1Num = Math.max(...vals.map(v => v.comp1));
-                comp2Num = Math.max(...vals.map(v => v.comp2));
-                break;
-            case 'MIN':
-                heroNum = Math.min(...vals.map(v => v.metric));
-                comp1Num = Math.min(...vals.map(v => v.comp1));
-                comp2Num = Math.min(...vals.map(v => v.comp2));
-                break;
-            case 'PERCENT':
-                heroNum = totalComp1 !== 0 ? total / totalComp1 : 0;
-                comp1Num = 1; // 100% baseline
-                comp2Num = totalComp2 !== 0 ? total / totalComp2 : 0;
-                break;
-            default:
-                return null;
-        }
-        const isPercent = aggType === 'PERCENT';
-        const heroStr = isPercent
-            ? formatRussianPercent(heroNum, false)
-            : fmtValue(heroNum);
-        // Rebuild comparisons from aggregated values
-        const comparisons = [];
-        if (hasComp1) {
-            const d = heroNum - comp1Num;
-            const status = d > 0 ? 'up' : d < 0 ? 'dn' : 'neutral';
-            comparisons.push({
-                label: comp1Label,
-                value: isPercent ? formatRussianPercent(comp1Num, false) : fmtValue(comp1Num),
-                delta: formatDeltaByFormat(d, comp1Num, resolveAutoFmt(deltaFmt1, aggType), isPercent),
-                status,
-                type: 'comp1',
-                rawDiff: d,
-                rawRef: comp1Num,
-            });
-        }
-        if (hasComp2) {
-            const d = heroNum - comp2Num;
-            const status = d > 0 ? 'up' : d < 0 ? 'dn' : 'neutral';
-            comparisons.push({
-                label: comp2Label,
-                value: isPercent ? formatRussianPercent(comp2Num, false) : fmtValue(comp2Num),
-                delta: formatDeltaByFormat(d, comp2Num, resolveAutoFmt(deltaFmt2, aggType), isPercent),
-                status,
-                type: 'comp2',
-                rawDiff: d,
-                rawRef: comp2Num,
-            });
-        }
-        return { value: heroStr, subtitle: baseView.subtitle, comparisons };
-    };
-    // Filter comparisons, override labels, re-format deltas, apply colorScheme inversion
-    const processView = (view, scheme1, scheme2, dFmt1, dFmt2, aggType) => ({
+    const isPartial = dataState === 'partial';
+    const isStale = dataState === 'stale';
+    // ── Loading state — skeleton placeholder ──
+    if (dataState === 'loading') {
+        return (_jsxs(KpiCardRoot, { ref: rootRef, width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: загрузка`, "aria-busy": "true", children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, children: [_jsx(CardHead, { children: _jsx(SkeletonBlock, { w: "120px", h: 14 }) }), _jsxs(SkeletonWrap, { children: [_jsx(SkeletonBlock, { w: "180px", h: 36 }), _jsx(SkeletonBlock, { w: "100px", h: 12 }), _jsx(SkeletonBlock, { w: "260px", h: 14 })] })] })] }));
+    }
+    // ── Error state — query or render failure ──
+    if (dataState === 'error') {
+        return (_jsxs(KpiCardRoot, { ref: rootRef, width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: ошибка`, children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, children: [_jsx(CardHead, { children: _jsx(CardTitle, { children: headerText }) }), _jsxs(EmptyStateWrap, { children: [_jsx(ErrorStateIcon, { "aria-hidden": "true" }), _jsx(EmptyStateText, { children: "\u041E\u0448\u0438\u0431\u043A\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043A\u0438 \u0434\u0430\u043D\u043D\u044B\u0445" })] })] })] }));
+    }
+    // ── Empty state — no data available ──
+    if (dataState === 'empty') {
+        return (_jsx(KpiCardRoot, { ref: rootRef, width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: нет данных`, children: _jsxs(Card, { className: CARD_CLASS, children: [_jsx(CardHead, { children: _jsx(CardTitle, { children: headerText }) }), _jsxs(EmptyStateWrap, { children: [_jsx(EmptyStateIcon, { "aria-hidden": "true", children: "\u2014" }), _jsx(EmptyStateText, { children: "\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u0437\u0430 \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043F\u0435\u0440\u0438\u043E\u0434" })] })] }) }));
+    }
+    const hasGroupby = Boolean(detailQueryParams?.groupbyPrimary);
+    // Filter comparisons, override labels, apply colorScheme inversion
+    const processView = (view, scheme1, scheme2, fmtDelta1, fmtDelta2) => ({
         ...view,
         comparisons: view.comparisons
             .filter(cmp => {
@@ -201,10 +326,15 @@ formatValueA, formatValueB, formatDelta, detailTopN, }) {
                 label = comp1Label;
             if (cmp.type === 'comp2')
                 label = comp2Label;
-            // Re-format delta from raw values when available
-            if (cmp.rawDiff != null && cmp.rawRef != null) {
-                const fmt = cmp.type === 'comp2' ? dFmt2 : dFmt1;
-                delta = formatDeltaByFormat(cmp.rawDiff, cmp.rawRef, resolveAutoFmt(fmt, aggType), aggType === 'PERCENT');
+            // Hide delta pill if showDelta is false for this comparison
+            const isDeltaVisible = cmp.type === 'comp2' ? showDelta2 : showDelta1;
+            if (!isDeltaVisible) {
+                return { ...cmp, label, delta: '', status: 'neutral' };
+            }
+            // Re-format delta from raw values using per-value formatter
+            if (cmp.rawDiff != null) {
+                const fmt = cmp.type === 'comp2' ? fmtDelta2 : fmtDelta1;
+                delta = fmt(cmp.rawDiff);
             }
             // Apply per-comparison colorScheme
             const scheme = cmp.type === 'comp2' ? scheme2 : scheme1;
@@ -215,9 +345,47 @@ formatValueA, formatValueB, formatDelta, detailTopN, }) {
             return { ...cmp, label, delta, status: inverted };
         }),
     });
-    const viewA = processView(recomputeFromRaw('SUM', formatValueA, modeAView, deltaFormat1A, deltaFormat2A) ?? modeAView, colorScheme1A, colorScheme2A, deltaFormat1A, deltaFormat2A, 'SUM');
-    const viewB = processView(recomputeFromRaw('SUM', formatValueB, modeBView, deltaFormat1B, deltaFormat2B) ?? modeBView, colorScheme1B, colorScheme2B, deltaFormat1B, deltaFormat2B, 'SUM');
-    const hasDetail = Boolean(rawRows?.length);
-    return (_jsxs(KpiCardRoot, { width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: ${modeAView.value}`, children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, onClick: hasDetail ? () => setIsModalOpen(true) : undefined, style: hasDetail ? { cursor: 'pointer' } : undefined, children: [_jsxs(CardHead, { children: [_jsx(CardTitle, { children: headerText }), isDual && (_jsxs(ToggleGroup, { role: "tablist", "aria-label": "Toggle mode A / B", children: [_jsx(ToggleButton, { active: isA, role: "tab", "aria-selected": isA, onClick: e => { e.stopPropagation(); setActiveMode('a'); }, children: toggleLabelA }), _jsx(ToggleButton, { active: !isA, role: "tab", "aria-selected": !isA, onClick: e => { e.stopPropagation(); setActiveMode('b'); }, children: toggleLabelB })] }))] }), _jsxs(DataContainer, { children: [_jsx(DataLayer, { style: layerStyle(isA, 'left'), "aria-hidden": !isA, children: _jsx(ViewContent, { view: viewA, skipAnimation: hasAnimated }) }), isDual && (_jsx(DataLayer, { style: layerStyle(!isA, 'right'), "aria-hidden": isA, children: _jsx(ViewContent, { view: viewB, skipAnimation: hasAnimated }) }))] })] }), hasDetail && detailDataRaw && (_jsx(DetailModal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), title: headerText, headerValue: isA ? viewA.value : viewB.value, detailDataRaw: detailDataRaw, aggregationType: isA ? 'SUM' : 'SUM', colorScheme1: isA ? colorScheme1A : colorScheme1B, colorScheme2: isA ? colorScheme2A : colorScheme2B, deltaFormat1: isA ? deltaFormat1A : deltaFormat1B, deltaFormat2: isA ? deltaFormat2A : deltaFormat2B, formatValue: isA ? formatValueA : formatValueB, formatDelta: formatDelta, hierarchyLabelPrimary: hierarchyLabelPrimary, hierarchyLabelSecondary: hierarchyLabelSecondary, enableComp1: enableComp1, enableComp2: enableComp2, comp1Label: comp1Label, comp2Label: comp2Label, topN: detailTopN, isDarkMode: isDarkMode }))] }));
+    const viewA = useMemo(() => processView(modeAView, colorScheme1A, colorScheme2A, formatDelta1A, formatDelta2A), [modeAView, colorScheme1A, colorScheme2A, deltaFormat1A, deltaFormat2A,
+        formatValueA, formatDelta1A, formatDelta2A, enableComp1, enableComp2,
+        comp1Label, comp2Label, showDelta1, showDelta2]);
+    const viewB = useMemo(() => processView(modeBView, colorScheme1B, colorScheme2B, formatDelta1B, formatDelta2B), [modeBView, colorScheme1B, colorScheme2B, deltaFormat1B, deltaFormat2B,
+        formatValueB, formatDelta1B, formatDelta2B, enableComp1, enableComp2,
+        comp1Label, comp2Label, showDelta1, showDelta2]);
+    // Detail modal only available when active mode has data
+    const activeView = isA ? viewA : viewB;
+    const activeModeEmpty = activeView.value === '' && activeView.comparisons.length === 0;
+    const hasDetail = (hasGroupby && !activeModeEmpty) || mockModeEnabled;
+    return (_jsxs(KpiCardRoot, { ref: rootRef, width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: ${modeAView.value}`, children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, clickable: hasDetail, onClick: hasDetail ? () => setIsModalOpen(true) : undefined, children: [isStale && _jsx(RefreshBar, {}), _jsxs(CardHead, { children: [_jsxs(CardTitle, { children: [headerText, mockModeEnabled && _jsx(MockBadge, { children: "\u0422\u0415\u0421\u0422" })] }), isPartial && _jsx(PartialBadge, { children: "\u0427\u0430\u0441\u0442\u0438\u0447\u043D\u044B\u0435 \u0434\u0430\u043D\u043D\u044B\u0435" }), isDual && (_jsxs(ToggleGroup, { role: "tablist", "aria-label": "Toggle mode A / B", children: [_jsx(ToggleButton, { active: isA, role: "tab", "aria-selected": isA, onClick: e => {
+                                            e.stopPropagation();
+                                            setActiveMode('a');
+                                        }, children: toggleLabelA }), _jsx(ToggleButton, { active: !isA, role: "tab", "aria-selected": !isA, onClick: e => {
+                                            e.stopPropagation();
+                                            setActiveMode('b');
+                                        }, children: toggleLabelB })] }))] }), _jsxs(DataContainer, { children: [_jsx(DataLayer, { style: layerStyle(isA, 'left'), "aria-hidden": !isA, children: viewA.value ? (_jsx(ViewContent, { view: viewA, skipAnimation: hasAnimated })) : (_jsxs(EmptyStateWrap, { children: [_jsx(EmptyStateIcon, { "aria-hidden": "true", children: "\u2014" }), _jsx(EmptyStateText, { children: "\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u0437\u0430 \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043F\u0435\u0440\u0438\u043E\u0434" })] })) }), isDual && (_jsx(DataLayer, { style: layerStyle(!isA, 'right'), "aria-hidden": isA, children: viewB.value ? (_jsx(ViewContent, { view: viewB, skipAnimation: hasAnimated })) : (_jsxs(EmptyStateWrap, { children: [_jsx(EmptyStateIcon, { "aria-hidden": "true", children: "\u2014" }), _jsx(EmptyStateText, { children: "\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445 \u0437\u0430 \u0432\u044B\u0431\u0440\u0430\u043D\u043D\u044B\u0439 \u043F\u0435\u0440\u0438\u043E\u0434" })] })) }))] })] }), hasDetail && detailQueryParams && (_jsx(DetailModal, { isOpen: isModalOpen, onClose: () => setIsModalOpen(false), title: headerText, headerValue: isA ? viewA.value : viewB.value, queryParams: detailQueryParams, activeMode: activeMode, aggregationType: 'SUM', colorScheme1: isA ? colorScheme1A : colorScheme1B, colorScheme2: isA ? colorScheme2A : colorScheme2B, deltaFormat1: isA ? deltaFormat1A : deltaFormat1B, deltaFormat2: isA ? deltaFormat2A : deltaFormat2B, formatValue: isA ? formatValueA : formatValueB, formatDelta: formatDelta, formatComp1: isA ? formatComp1A : formatComp1B, formatComp2: isA ? formatComp2A : formatComp2B, formatDelta1: isA ? formatDelta1A : formatDelta1B, formatDelta2: isA ? formatDelta2A : formatDelta2B, showDelta1: showDelta1, showDelta2: showDelta2, colFact: detailColFact, colComp1: detailColComp1, colDelta1: detailColDelta1, colComp2: detailColComp2, colDelta2: detailColDelta2, hierarchyLabelPrimary: hierarchyLabelPrimary, hierarchyLabelSecondary: hierarchyLabelSecondary, enableComp1: enableComp1, enableComp2: enableComp2, comp1Label: comp1Label, comp2Label: comp2Label, topN: detailTopN, pageSize: detailPageSize, isDarkMode: isDarkMode, mockModeEnabled: mockModeEnabled, mockPreset: mockPreset, mockCustomJson: mockCustomJson }))] }));
+}, arePropsEqual);
+class KpiCardErrorBoundary extends React.Component {
+    constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+    }
+    static getDerivedStateFromError() {
+        return { hasError: true };
+    }
+    componentDidCatch(error, info) {
+        // eslint-disable-next-line no-console
+        console.error('[KPI Card] Render error:', error, info.componentStack);
+    }
+    render() {
+        if (this.state.hasError) {
+            const { width, height, headerText } = this.props;
+            return (_jsxs(KpiCardRoot, { width: width, height: height, "data-theme": "light", role: "figure", "aria-label": `${headerText}: ошибка`, children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, children: [_jsx(CardHead, { children: _jsx(CardTitle, { children: headerText || 'KPI' }) }), _jsxs(EmptyStateWrap, { children: [_jsx(ErrorStateIcon, { "aria-hidden": "true" }), _jsx(EmptyStateText, { children: "\u041E\u0448\u0438\u0431\u043A\u0430 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0435\u043D\u0438\u044F" })] })] })] }));
+        }
+        return _jsx(KpiCardMemo, { ...this.props });
+    }
 }
+// Superset expects a plain FunctionComponent, not MemoExoticComponent.
+// ErrorBoundary wraps the memoized component to catch render crashes.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const KpiCard = KpiCardErrorBoundary;
+export default KpiCard;
 //# sourceMappingURL=KpiCard.js.map

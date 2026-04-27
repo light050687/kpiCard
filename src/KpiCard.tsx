@@ -48,7 +48,8 @@ function easeOutQuart(t: number): number {
 }
 
 function counterDuration(target: number): number {
-  return Math.min(1200, 700 + target * 30);
+  // DS v2.0: максимум анимации 0.6s (раздел 08, "Переходы и анимации")
+  return Math.min(600, 350 + target * 15);
 }
 
 function parseHeroInt(
@@ -672,7 +673,6 @@ const KpiCardMemo = React.memo(function KpiCardInner({
       </Card>
 
       {hasDetail && detailQueryParams && (
-        // @ts-expect-error React.memo type compat with @types/react 17
         <DetailModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
@@ -764,7 +764,6 @@ class KpiCardErrorBoundary extends React.Component<
         </KpiCardRoot>
       );
     }
-    // @ts-expect-error React.memo type compat with @types/react 17
     return <KpiCardMemo {...this.props} />;
   }
 }

@@ -3,19 +3,26 @@ import buildQuery from './buildQuery';
 import controlPanel from './controlPanel';
 import transformProps from './transformProps';
 import thumbnail from '../images/thumbnail.png';
-export default class SupersetPluginChartKpiCard extends ChartPlugin {
+/**
+ * Scorecard plugin for Superset (internal: KpiCard).
+ *
+ * Register in MainPreset.js with:
+ *   new SupersetPluginChartScorecard().configure({ key: 'ext-kpi-card' })
+ * (viz_type ключ оставлен 'ext-kpi-card' ради совместимости с существующими чартами в БД.)
+ */
+export default class SupersetPluginChartScorecard extends ChartPlugin {
     constructor() {
         super({
             buildQuery,
             controlPanel,
             loadChart: () => import('../KpiCard'),
             metadata: new ChartMetadata({
-                name: 'KPI Card',
-                description: 'Single KPI metric card with plan/YoY comparisons, abs/pct toggle, ' +
-                    'and delta pills. Follows Design System v2.0.',
+                name: '[MRTS] Scorecard',
+                description: 'KPI-карточка с план/ПГ сравнениями, dual-mode toggle ' +
+                    'и drill-down модалью. Design System v2.0.',
                 thumbnail,
-                tags: ['KPI', 'Big Number', 'Comparison', 'Featured'],
-                category: 'KPI Indicators',
+                tags: ['MRTS', 'KPI', 'Big Number', 'Comparison', 'Featured'],
+                category: 'MRTS',
             }),
             transformProps,
         });

@@ -1,4 +1,4 @@
-export { default as SupersetPluginChartKpiCard } from './plugin';
+export { default as SupersetPluginChartScorecard } from './plugin';
 export { default as KpiCard } from './KpiCard';
 export type {
   KpiCardFormData,
