@@ -1,5 +1,19 @@
 import { styled } from '@superset-ui/core';
+import { keyframes } from '@emotion/react';
 import { LIGHT_TOKENS as L, DARK_TOKENS as D, FONTS } from './themeTokens';
+
+/* ── Emotion keyframes (для DetailModal — портал, нужны через keyframes
+   функцию, чтобы Emotion гарантированно вставил @keyframes в CSS bundle
+   с уникальным именем; не зависит от <style> injection или DOM scope). */
+
+export const spinKf = keyframes`
+  to { transform: rotate(360deg); }
+`;
+
+export const refreshSlideKf = keyframes`
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(350%); }
+`;
 
 /*
  * Design System v2.0 tokens as CSS custom properties.
@@ -51,9 +65,15 @@ export const KEYFRAMES_CSS = `
   to{opacity:1}
 }
 @keyframes kpi-skeleton-pulse{
-  0%{opacity:.12}
-  50%{opacity:.22}
-  100%{opacity:.12}
+  /* Linear-gradient shimmer (вместо opacity-pulse). opacity 0.12-0.22 на
+     dark mode давала почти нулевой контраст между --g200 (#272B30) и --s
+     (#171A1E) — placeholder-блоки визуально неотличимы от Card background.
+     Shift background-position создаёт чёткий визуальный pulse, видимый и
+     в light, и в dark режиме. Тот же подход что ds2-skeleton-shimmer в
+     head_custom_extra.html — visual continuity между ChartHolder shape-
+     skeleton и plugin-internal skeleton. */
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
 }
 @keyframes kpi-overlay-in{
   from{opacity:0}
@@ -62,6 +82,14 @@ export const KEYFRAMES_CSS = `
 @keyframes kpi-modal-in{
   from{opacity:0;transform:translateY(12px) scale(.97)}
   to{opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes kpi-spin{
+  to{transform:rotate(360deg)}
+}
+@keyframes kpi-refresh-slide{
+  0%{transform:translateX(-100%)}
+  50%{transform:translateX(150%)}
+  100%{transform:translateX(150%)}
 }
 `;
 
@@ -112,8 +140,19 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
 
   width: 100%;
   height: 100%;
+  /* max-height: 100% запрещает плагину вырастать выше chart-holder
+     родителя. Без этого loaded card content + Card padding мог
+     forces chart-holder grow → row equalization растягивает все
+     siblings → shift между skeleton (= chart-holder min-height: outerH)
+     и loaded размером. С max-height card.overflow:hidden ограничивает
+     content внутри fixed area = skeleton/loaded имеют одинаковый
+     container size. */
+  max-height: 100%;
+  /* Размер плагина полностью определяется outer ResizableContainer
+     (синяя рамка). Никаких min-height/min-width — визуал заполняет
+     рамку и меняется вместе с ней. */
   box-sizing: border-box;
-  overflow: visible;
+  overflow: hidden;
   container-type: inline-size;
   container-name: kpi;
   padding: 0;
@@ -124,29 +163,27 @@ export const KpiCardRoot = styled.div<{ width: number; height: number }>`
   font-family: var(--f);
   -webkit-font-smoothing: antialiased;
 
-  /* DS v2.0 / WCAG 2.3.3: prefers-reduced-motion отключает все анимации */
-  @media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-      animation-duration: 0.01ms !important;
-      animation-iteration-count: 1 !important;
-      transition-duration: 0.01ms !important;
-      animation-delay: 0ms !important;
-    }
-  }
+  /* WCAG 2.3.3: функциональные анимации (loading spinner, progress bar,
+     skeleton-shimmer) НЕ выключаем при prefers-reduced-motion — это
+     индикаторы состояния, без которых юзер не понимает что происходит
+     (короткие циклические анимации, не трясут глаза). Декоративные
+     transitions/transforms выключаются ниже точечно при необходимости. */
 `;
 
 /* ── Card ── */
 
 export const Card = styled.div<{ clickable?: boolean }>`
+  /* DS v2.0: визуал заполняет ResizableContainer (синяя рамка в edit-mode).
+     Card без своего border — outer outline = единственная рамка.
+     Background var(--s) визуально отделяет KPI от bg-фона дашборда. */
   background: var(--s);
-  border: 1px solid var(--g200);
+  border: 1px solid transparent;
   border-radius: 10px;
   padding: 16px 20px;
   overflow: hidden;
   position: relative;
   width: 100%;
+  height: 100%;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -158,7 +195,7 @@ export const Card = styled.div<{ clickable?: boolean }>`
   animation-fill-mode: both;
 
   &:hover {
-    border-color: var(--g300);
+    border-color: var(--g200);
   }
 
   @container kpi (max-width: 400px) {
@@ -176,22 +213,29 @@ export const Card = styled.div<{ clickable?: boolean }>`
   }
 `;
 
-/** Mock mode badge — matches DS 2.0 "Статусный бейдж": моно, 10px / 14px, 600 */
+/** Mock mode badge — DS v2.0 "Статусный бейдж": --fs-nano UPPER моно.
+    Стиль superscript: text по центру + чуть выше базовой линии (как ²). */
 export const MockBadge = styled.span`
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   padding: 2px 8px;
   border-radius: 6px;
   background: var(--wn-b);
   color: var(--wn);
   font-family: var(--m);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
-  letter-spacing: normal;
+  font-size: var(--fs-nano);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-left: 6px;
-  vertical-align: middle;
+  /* Superscript-effect: badge поднят на ~30% высоты от базовой линии,
+     как «возведение в квадрат» — визуально badge выше текста заголовка. */
+  vertical-align: super;
+  position: relative;
+  top: -2px;
   user-select: none;
 `;
 
@@ -216,13 +260,14 @@ export const EmptyStateIcon = styled.div`
   align-items: center;
   justify-content: center;
   color: var(--g400);
-  font-size: 18px;
+  font-size: var(--fs-subtitle);
 `;
 
 export const EmptyStateText = styled.div`
-  /* DS v2.0: empty-state текст 13px --g500 */
+  /* DS v2.0 fluid: --fs-interactive (13-15) для empty-state */
   font-family: var(--f);
-  font-size: 13px;
+  font-size: var(--fs-interactive);
+  font-weight: 500;
   color: var(--g500);
   text-align: center;
   line-height: 1.4;
@@ -237,7 +282,7 @@ export const ErrorStateIcon = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 18px;
+  font-size: var(--fs-subtitle);
   font-weight: 700;
   color: var(--dn);
 
@@ -248,12 +293,47 @@ export const ErrorStateIcon = styled.div`
 
 /* ── Loading skeleton ── */
 
-export const SkeletonBlock = styled.div<{ w?: string; h?: number }>`
+export const SkeletonBlock = styled.div<{ w?: string; h?: number; grow?: number }>`
   width: ${({ w }) => w || '100%'};
-  height: ${({ h }) => h || 16}px;
+  /* min-height вместо height чтобы block мог расти через flex-grow.
+     grow prop управляет распределением free space в SkeletonWrap. */
+  min-height: ${({ h }) => h || 16}px;
+  flex-grow: ${({ grow }) => grow ?? 0};
+  flex-shrink: 0;
   border-radius: 6px;
-  background: var(--g200);
-  animation: kpi-skeleton-pulse 1.4s ease-in-out infinite;
+  /* Linear-gradient между --g100 и --g200: видимый shimmer на любой
+     теме (dark/light). Animation kpi-skeleton-pulse теперь сдвигает
+     background-position вместо opacity — высокий контраст. */
+  background: linear-gradient(
+    110deg,
+    var(--g100) 8%,
+    var(--g200) 18%,
+    var(--g100) 33%
+  );
+  background-size: 200% 100%;
+  animation: kpi-skeleton-pulse 1.6s ease-in-out infinite;
+`;
+
+/* SkeletonText — inline placeholder который рендерится ВНУТРИ оригинального
+   text-component (HeroValue, Subtitle, CardTitle, ComparisonValue и т.д.).
+   text invisible (color: transparent), но reserves real text dimensions
+   через nbsp/em-dash characters → размер = same as actual text при load.
+   Это react-loading-skeleton best practice: identical DOM tree → identical
+   размер 1:1 без хардкодов. */
+export const SkeletonText = styled.span`
+  display: inline-block;
+  color: transparent !important;
+  border-radius: 6px;
+  user-select: none;
+  /* Linear-gradient shimmer (как SkeletonBlock) — видимый на dark mode. */
+  background: linear-gradient(
+    110deg,
+    var(--g100) 8%,
+    var(--g200) 18%,
+    var(--g100) 33%
+  );
+  background-size: 200% 100%;
+  animation: kpi-skeleton-pulse 1.6s ease-in-out infinite;
 `;
 
 export const SkeletonWrap = styled.div`
@@ -261,7 +341,13 @@ export const SkeletonWrap = styled.div`
   flex-direction: column;
   gap: 12px;
   padding: 4px 0;
+  /* flex: 1 распирает SkeletonWrap до Card content height. SkeletonBlock
+     внутри с grow={1} заполняет free space → skeleton total = Card height
+     автоматически, независимо от outerH. Это устраняет shift между
+     skeleton и loaded состоянием когда row align-items: stretch
+     растягивает все cards до max content (>= outerH). */
   flex: 1;
+  min-height: 0;
 `;
 
 /* ── Partial state badge ── */
@@ -275,9 +361,10 @@ export const PartialBadge = styled.div`
   background: var(--wn-b);
   color: var(--wn);
   font-family: var(--m);
-  font-size: 10px;
-  font-weight: 600;
-  line-height: 14px;
+  font-size: var(--fs-nano);
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
   margin-left: auto;
 `;
@@ -301,11 +388,13 @@ export const CardHead = styled.div`
 `;
 
 export const CardTitle = styled.div`
+  /* DS v2.0 §02 «Заголовок секции»: 14px / 700 / 0.05em / Пропорциональный (sans) UPPER.
+     На mobile (<768px) → 13px (адаптивная типографика по дизайн-доку). */
   font-family: var(--f);
-  font-size: 14px;
+  font-size: var(--fs-body);
   font-weight: 700;
   letter-spacing: 0.05em;
-  line-height: 18px;
+  line-height: 1.3;
   text-transform: uppercase;
   color: var(--ink);
   position: relative;
@@ -324,12 +413,6 @@ export const CardTitle = styled.div`
 
   .kpi-card:hover &::after {
     width: 100%;
-  }
-
-  /* DS v2.0 «Заголовок секции»: минимум 13px (mobile ≤428px) */
-  @container kpi (max-width: 428px) {
-    font-size: 13px;
-    line-height: 17px;
   }
 `;
 
@@ -356,10 +439,11 @@ export const ToggleGroup = styled.div`
 `;
 
 export const ToggleButton = styled.button<{ active: boolean }>`
+  /* DS v2.0 fluid: --fs-micro (11-13) для UPPERCASE-кнопок переключения */
   border: none;
   background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -380,6 +464,10 @@ export const ToggleButton = styled.button<{ active: boolean }>`
 export const DataContainer = styled.div`
   display: grid;
   overflow: hidden;
+  /* flex: 1 заполняет Card content area. Используется в обоих состояниях
+     (loaded и skeleton) — DOM structure одинаковая → размер совпадает. */
+  flex: 1;
+  min-height: 0;
 `;
 
 export const DataLayer = styled.div`
@@ -393,8 +481,10 @@ export const DataLayer = styled.div`
 /* ── Hero number ── */
 
 export const HeroValue = styled.div`
+  /* DS v2.0 fluid: clamp(28px, 1.5rem + 2.4cqi, 56px) — растёт с шириной карточки.
+     Минимум 28px (даже на узких карточках), максимум 56px на 4K-мониторах. */
   font-family: var(--f);
-  font-size: 28px;
+  font-size: var(--fs-hero);
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -406,37 +496,24 @@ export const HeroValue = styled.div`
   .kpi-card:hover & {
     color: var(--c-sky);
   }
-
-  /* DS v2.0 адаптив hero: 28 / 26 / 24 / 22 (минимум 22px) */
-  @container kpi (max-width: 1024px) {
-    font-size: 26px;
-  }
-  @container kpi (max-width: 768px) {
-    font-size: 24px;
-  }
-  @container kpi (max-width: 428px) {
-    font-size: 22px;
-  }
 `;
 
 export const HeroUnit = styled.span`
-  font-size: 14px;
+  /* DS v2.0 fluid: --fs-meta (12-14) для unit рядом с hero-числом. */
+  font-size: var(--fs-meta);
   font-weight: 600;
   margin-left: 2px;
   color: var(--g500);
-
-  @container kpi (max-width: 428px) {
-    font-size: 12px;
-  }
 `;
 
 /* ── Subtitle ── */
 
 export const Subtitle = styled.div`
+  /* DS v2.0 fluid: --fs-meta (12-14) для subtitle (период/метаданные) */
   font-family: var(--m);
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 16px;
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--g600);
   margin-bottom: 14px;
   animation-name: kpi-sub-in;
@@ -445,10 +522,7 @@ export const Subtitle = styled.div`
   animation-delay: 0.4s;
   animation-fill-mode: both;
 
-  /* DS v2.0: минимум 10px моно, не скрывать (несёт период/метаданные) */
   @container kpi (max-width: 428px) {
-    font-size: 10px;
-    line-height: 14px;
     margin-bottom: 8px;
   }
 `;
@@ -505,21 +579,22 @@ export const ComparisonItem = styled.div`
 `;
 
 export const ComparisonLabel = styled.span`
+  /* DS v2.0 fluid: --fs-micro (11-13) UPPERCASE для метки сравнения */
   font-family: var(--m);
-  font-size: 11px;
-  line-height: 16px;
-  font-weight: 500;
+  font-size: var(--fs-micro);
+  line-height: 1.4;
+  font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--g600);
   white-space: nowrap;
-
 `;
 
 export const ComparisonValue = styled.span`
+  /* DS v2.0 fluid: --fs-meta (12-14) mono с tabular-nums */
   font-family: var(--m);
-  font-size: 11px;
-  line-height: 16px;
+  font-size: var(--fs-meta);
+  line-height: 1.4;
   font-weight: 500;
   font-variant-numeric: tabular-nums;
   color: var(--g700);
@@ -529,9 +604,11 @@ export const ComparisonValue = styled.span`
 /* ── Delta pill ── */
 
 export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }>`
+  /* DS v2.0 fluid: --fs-meta (12-14) mono для delta-pill (≥12 даже на узких) */
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-meta);
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   padding: 4px 8px;
   border-radius: 6px;
   white-space: nowrap;
@@ -565,9 +642,7 @@ export const DeltaPill = styled.span<{ status: string; skipAnimation?: boolean }
     }};
   }
 
-  /* DS v2.0: жёсткий минимум 10px (не уходим в 9px) */
   @container kpi (max-width: 428px) {
-    font-size: 10px;
     padding: 2px 6px;
   }
 `;
@@ -630,19 +705,22 @@ export const ModalHead = styled.div`
 `;
 
 export const ModalTitle = styled.span`
+  /* DS v2.0: заголовок модалки — sans, --fs-subtitle (16-20), bold, без UPPER */
   font-family: var(--f);
-  font-size: 14px;
+  font-size: var(--fs-subtitle);
   font-weight: 700;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  line-height: 18px;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
   color: var(--ink);
 `;
 
 export const ModalValue = styled.span`
+  /* DS v2.0: число рядом с заголовком модалки — НЕ доминирует, размер
+     меньше ModalTitle. Используем body (14-17), не hero/title. */
   font-family: var(--m);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--fs-body);
+  font-weight: 700;
+  letter-spacing: -0.01em;
   color: var(--c-sky);
   font-variant-numeric: tabular-nums;
 `;
@@ -659,7 +737,7 @@ export const CloseButton = styled.button`
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: var(--fs-body);
   line-height: 1;
   color: var(--g500);
   transition: border-color 0.15s ${EASE}, color 0.15s ${EASE};
@@ -716,11 +794,12 @@ export const SearchIcon = styled.svg`
 `;
 
 export const SearchInput = styled.input`
+  /* DS v2.0 fluid: --fs-meta (12-14) для inputs (читаемость > UPPER-сжатие) */
   border: none;
   outline: none;
   background: transparent;
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-meta);
   color: var(--ink);
   width: 100%;
   min-width: 0;
@@ -741,10 +820,11 @@ export const SearchScopeToggle = styled.div`
 `;
 
 export const SearchScopeButton = styled.button<{ active: boolean }>`
+  /* DS v2.0 fluid: --fs-micro для UPPER toggle */
   border: none;
   background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -772,7 +852,7 @@ export const ExactMatchLabel = styled.label`
   align-items: center;
   gap: 4px;
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-meta);
   color: var(--g500);
   cursor: pointer;
   flex-shrink: 0;
@@ -809,10 +889,11 @@ export const ModeToggle = styled.div`
 `;
 
 export const ModeButton = styled.button<{ active: boolean }>`
+  /* DS v2.0 fluid: --fs-micro для UPPER mode toggle */
   border: none;
   background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -852,7 +933,7 @@ export const FlipButton = styled.button`
 
 export const FlipIcon = styled.span<{ flipped?: boolean }>`
   display: inline-block;
-  font-size: 11px;
+  font-size: var(--fs-micro);
   line-height: 1;
   transition: transform 0.3s ${EASE};
   transform: ${({ flipped }) => (flipped ? 'rotate(180deg)' : 'none')};
@@ -860,7 +941,7 @@ export const FlipIcon = styled.span<{ flipped?: boolean }>`
 
 export const FlipLabel = styled.span`
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-meta);
   font-weight: 500;
   color: var(--g600);
 `;
@@ -868,7 +949,7 @@ export const FlipLabel = styled.span`
 export const ResultsCount = styled.span`
   margin-left: auto;
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-meta);
   color: var(--g500);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -885,7 +966,7 @@ export const PaginationWrap = styled.div`
   padding: 8px 20px;
   border-top: 1px solid var(--g100);
   font-family: var(--m);
-  font-size: 13px;
+  font-size: var(--fs-interactive);
   font-variant-numeric: tabular-nums;
 `;
 
@@ -897,7 +978,7 @@ export const PageBtn = styled.button<{ isActive?: boolean }>`
   border: none;
   border-radius: 6px;
   font-family: var(--m);
-  font-size: 13px;
+  font-size: var(--fs-interactive);
   font-variant-numeric: tabular-nums;
   cursor: pointer;
   transition: background 0.15s;
@@ -932,7 +1013,7 @@ export const PageInput = styled.input`
   border: 1px solid var(--g200);
   border-radius: 6px;
   font-family: var(--m);
-  font-size: 12px;
+  font-size: var(--fs-meta);
   text-align: center;
   color: var(--ink);
   outline: none;
@@ -940,7 +1021,7 @@ export const PageInput = styled.input`
 
   &::placeholder {
     color: var(--g400);
-    font-size: 13px;
+    font-size: var(--fs-interactive);
     font-weight: 500;
   }
 
@@ -980,9 +1061,10 @@ export const THead = styled.thead`
 
 export const THRow = styled.tr`
   & > th {
+    /* DS v2.0 fluid: --fs-micro для table-header UPPER */
     padding: 10px 12px;
     font-family: var(--m);
-    font-size: 11px;
+    font-size: var(--fs-micro);
     font-weight: 600;
     letter-spacing: 0.06em;
     text-transform: uppercase;
@@ -1000,7 +1082,6 @@ export const THRow = styled.tr`
   @media (max-width: 428px) {
     & > th {
       padding: 8px 8px;
-      font-size: 10px;
     }
   }
 `;
@@ -1015,9 +1096,10 @@ export const GroupRow = styled.tr`
   }
 
   & > td {
+    /* DS v2.0 fluid: --fs-body для group-row */
     font-family: var(--f);
-    font-size: 14px;
-    line-height: 20px;
+    font-size: var(--fs-body);
+    line-height: 1.5;
     padding: 12px 12px;
     font-weight: 600;
     color: var(--ink);
@@ -1028,7 +1110,7 @@ export const GroupRow = styled.tr`
   & > td.r {
     text-align: right;
     font-family: var(--m);
-    font-size: 14px;
+    font-size: var(--fs-body);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1036,11 +1118,6 @@ export const GroupRow = styled.tr`
   @media (max-width: 428px) {
     & > td {
       padding: 8px 8px;
-      font-size: 13px;
-      line-height: 18px;
-    }
-    & > td.r {
-      font-size: 13px;
     }
   }
 `;
@@ -1053,9 +1130,10 @@ export const ChildRow = styled.tr`
   }
 
   & > td {
+    /* DS v2.0 fluid: --fs-interactive (13-15) для child-row */
     font-family: var(--f);
-    font-size: 13px;
-    line-height: 20px;
+    font-size: var(--fs-interactive);
+    line-height: 1.5;
     padding: 12px 12px;
     color: var(--g600);
     font-weight: 400;
@@ -1070,7 +1148,7 @@ export const ChildRow = styled.tr`
   & > td.r {
     text-align: right;
     font-family: var(--m);
-    font-size: 13px;
+    font-size: var(--fs-interactive);
     font-weight: 500;
     font-variant-numeric: tabular-nums;
   }
@@ -1078,21 +1156,16 @@ export const ChildRow = styled.tr`
   @media (max-width: 428px) {
     & > td {
       padding: 8px 8px;
-      font-size: 12px;
-      line-height: 18px;
     }
     & > td:first-of-type {
       padding-left: 28px;
-    }
-    & > td.r {
-      font-size: 12px;
     }
   }
 `;
 
 export const Chevron = styled.span<{ expanded: boolean }>`
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--fs-meta);
   width: 16px;
   margin-right: 8px;
   color: var(--g500);
@@ -1107,7 +1180,7 @@ export const EmptyRow = styled.tr`
     padding: 32px 12px;
     text-align: center;
     font-family: var(--f);
-    font-size: 13px;
+    font-size: var(--fs-interactive);
     color: var(--g500);
   }
 `;
@@ -1115,7 +1188,7 @@ export const EmptyRow = styled.tr`
 /** Small delta pill for table cells */
 export const TablePill = styled.span<{ status: string }>`
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   padding: 4px 8px;
   border-radius: 6px;
@@ -1152,7 +1225,7 @@ export const ModalFoot = styled.div`
 
 export const FooterHint = styled.span`
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-meta);
   color: var(--g500);
 `;
 
@@ -1162,7 +1235,7 @@ export const ExportButton = styled.button`
   background: transparent;
   color: var(--g600);
   font-family: var(--m);
-  font-size: 11px;
+  font-size: var(--fs-micro);
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
@@ -1203,12 +1276,7 @@ export const RefreshBar = styled.div`
     width: 40%;
     height: 100%;
     background: var(--c-sky);
-    animation: kpi-refresh-slide 1.2s ease-in-out infinite;
-  }
-
-  @keyframes kpi-refresh-slide {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
+    animation: ${refreshSlideKf} 1.2s ease-in-out infinite;
   }
 `;
 
@@ -1223,7 +1291,7 @@ export const InlineSpinnerSmall = styled.span`
   border: 1.5px solid var(--g200);
   border-top-color: var(--c-sky);
   border-radius: 50%;
-  animation: kpi-spin 0.7s linear infinite;
+  animation: ${spinKf} 0.7s linear infinite;
 `;
 
 /* Spinner (large) — empty-row loader */
@@ -1234,7 +1302,7 @@ export const InlineSpinnerLarge = styled.span`
   border: 2px solid var(--g200);
   border-top-color: var(--c-sky);
   border-radius: 50%;
-  animation: kpi-spin 0.7s linear infinite;
+  animation: ${spinKf} 0.7s linear infinite;
 `;
 
 /* Centered loader row (icon + caption) */
@@ -1260,7 +1328,7 @@ export const RetryButton = styled.button`
   border: 1px solid var(--g300);
   background: var(--s);
   cursor: pointer;
-  font-size: 12px;
+  font-size: var(--fs-meta);
   font-family: var(--f);
   color: var(--ink);
 

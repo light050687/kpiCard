@@ -13,6 +13,7 @@ import {
   Card,
   CardHead,
   CardTitle,
+  SkeletonText,
   ToggleGroup,
   ToggleButton,
   DataContainer,
@@ -249,6 +250,7 @@ const KpiCardMemo = React.memo(function KpiCardInner({
   const [hasAnimated, setHasAnimated] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
 
+
   // ── Hide Superset dashboard chart wrapper (title, background, shadow) ──
   // Keep the three-dot menu (⋮) accessible but hide title text and wrapper chrome
   useEffect(() => {
@@ -471,14 +473,39 @@ const KpiCardMemo = React.memo(function KpiCardInner({
       >
         <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
         <Card className={CARD_CLASS}>
+          {/* IDENTICAL DOM TREE с loaded state: те же CardTitle / HeroValue /
+              Subtitle / ComparisonRow components с placeholder text внутри
+              SkeletonText. Браузер reserves РЕАЛЬНУЮ font-size + line-height
+              для каждого text node → размер skeleton = 1:1 с loaded card,
+              без хардкодов и независимо от outerH. */}
           <CardHead>
-            <SkeletonBlock w="120px" h={14} />
+            <CardTitle>
+              <SkeletonText>{'      '}</SkeletonText>
+            </CardTitle>
           </CardHead>
-          <SkeletonWrap>
-            <SkeletonBlock w="180px" h={36} />
-            <SkeletonBlock w="100px" h={12} />
-            <SkeletonBlock w="260px" h={14} />
-          </SkeletonWrap>
+          <DataContainer>
+            <DataLayer>
+              <HeroValue>
+                <SkeletonText>{'—————'}</SkeletonText>
+              </HeroValue>
+              <Subtitle>
+                <SkeletonText>{'——————————'}</SkeletonText>
+              </Subtitle>
+              <ComparisonSection skipAnimation>
+                <ComparisonItem>
+                  <ComparisonLabel>
+                    <SkeletonText>{'———'}</SkeletonText>
+                  </ComparisonLabel>
+                  <ComparisonValue>
+                    <SkeletonText>{'—————'}</SkeletonText>
+                  </ComparisonValue>
+                  <DeltaPill status="neutral" skipAnimation>
+                    <SkeletonText>{'————'}</SkeletonText>
+                  </DeltaPill>
+                </ComparisonItem>
+              </ComparisonSection>
+            </DataLayer>
+          </DataContainer>
         </Card>
       </KpiCardRoot>
     );

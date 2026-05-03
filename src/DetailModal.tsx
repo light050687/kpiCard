@@ -26,6 +26,7 @@ import type { FormatRowOpts } from './utils/detailApi';
 import { getPreset } from './mocks/presets';
 import { generateMockGroups, generateMockChildren } from './mocks/mockDetailGenerator';
 import {
+  KEYFRAMES_CSS,
   Overlay,
   Modal,
   ModalHead,
@@ -893,6 +894,13 @@ function DetailModalInner({
 
   return (
     <Overlay closing={isClosing} onClick={handleOverlayClick} style={isHidden ? { visibility: 'hidden', pointerEvents: 'none', opacity: 0 } : undefined}>
+      {/* XSS-safe: KEYFRAMES_CSS — compile-time константа. Инжектим
+          здесь потому что DetailModal рендерится в портале вне
+          KpiCardRoot, и keyframes (kpi-spin, kpi-refresh-slide,
+          kpi-modal-in и т.д.) должны быть в DOM портала чтобы
+          spinner/progress-bar работали. */}
+      {/* eslint-disable-next-line react/no-danger */}
+      <style dangerouslySetInnerHTML={{ __html: KEYFRAMES_CSS }} />
       <Modal
         ref={modalRef}
         closing={isClosing}
@@ -1013,7 +1021,6 @@ function DetailModalInner({
                       <InlineSpinnerLarge />
                       Загрузка…
                     </LoaderRowInner>
-                    <style>{`@keyframes kpi-spin{to{transform:rotate(360deg)}}`}</style>
                   </td>
                 </EmptyRow>
               ) : fetchError ? (

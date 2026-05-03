@@ -1,6 +1,6 @@
 import { jsx as _jsx, jsxs as _jsxs, Fragment as _Fragment } from "react/jsx-runtime";
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { CARD_CLASS, KEYFRAMES_CSS, KpiCardRoot, Card, CardHead, CardTitle, ToggleGroup, ToggleButton, DataContainer, DataLayer, HeroValue, Subtitle, ComparisonSection, ComparisonItem, ComparisonLabel, ComparisonValue, DeltaPill, EmptyStateWrap, EmptyStateIcon, EmptyStateText, PartialBadge, MockBadge, SkeletonBlock, SkeletonWrap, ErrorStateIcon, RefreshBar, } from './styles';
+import { CARD_CLASS, KEYFRAMES_CSS, KpiCardRoot, Card, CardHead, CardTitle, SkeletonText, ToggleGroup, ToggleButton, DataContainer, DataLayer, HeroValue, Subtitle, ComparisonSection, ComparisonItem, ComparisonLabel, ComparisonValue, DeltaPill, EmptyStateWrap, EmptyStateIcon, EmptyStateText, PartialBadge, MockBadge, ErrorStateIcon, RefreshBar, } from './styles';
 import DetailModal from './DetailModal';
 /* ── Counter animation ──────────────────────────────────────────────
  * The integer part of the hero value counts up from 0 → target.
@@ -297,7 +297,7 @@ formatValueA, formatValueB, formatDelta, detailTopN, detailPageSize, mockModeEna
     const isStale = dataState === 'stale';
     // ── Loading state — skeleton placeholder ──
     if (dataState === 'loading') {
-        return (_jsxs(KpiCardRoot, { ref: rootRef, width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: загрузка`, "aria-busy": "true", children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, children: [_jsx(CardHead, { children: _jsx(SkeletonBlock, { w: "120px", h: 14 }) }), _jsxs(SkeletonWrap, { children: [_jsx(SkeletonBlock, { w: "180px", h: 36 }), _jsx(SkeletonBlock, { w: "100px", h: 12 }), _jsx(SkeletonBlock, { w: "260px", h: 14 })] })] })] }));
+        return (_jsxs(KpiCardRoot, { ref: rootRef, width: width, height: height, "data-theme": isDarkMode ? 'dark' : 'light', role: "figure", "aria-label": `${headerText}: загрузка`, "aria-busy": "true", children: [_jsx("style", { dangerouslySetInnerHTML: { __html: KEYFRAMES_CSS } }), _jsxs(Card, { className: CARD_CLASS, children: [_jsx(CardHead, { children: _jsx(CardTitle, { children: _jsx(SkeletonText, { children: '      ' }) }) }), _jsx(DataContainer, { children: _jsxs(DataLayer, { children: [_jsx(HeroValue, { children: _jsx(SkeletonText, { children: '—————' }) }), _jsx(Subtitle, { children: _jsx(SkeletonText, { children: '——————————' }) }), _jsx(ComparisonSection, { skipAnimation: true, children: _jsxs(ComparisonItem, { children: [_jsx(ComparisonLabel, { children: _jsx(SkeletonText, { children: '———' }) }), _jsx(ComparisonValue, { children: _jsx(SkeletonText, { children: '—————' }) }), _jsx(DeltaPill, { status: "neutral", skipAnimation: true, children: _jsx(SkeletonText, { children: '————' }) })] }) })] }) })] })] }));
     }
     // ── Error state — query or render failure ──
     if (dataState === 'error') {
