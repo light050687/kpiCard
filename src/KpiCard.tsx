@@ -252,14 +252,31 @@ const KpiCardMemo = React.memo(function KpiCardInner({
 
 
   // ── Hide Superset dashboard chart wrapper (title, background, shadow) ──
+  // NOTE: Этот эффект СНАЧАЛА жил здесь как per-instance DOM manipulation
+  // (inject <style>, переместить ⋮ через ref). После того как universal
+  // CSS-reset был добавлен в DashboardBuilder.tsx (для всех ext-* плагинов
+  // через :has(div[data-test-viz-type^='ext-'])), эта инжекция стала
+  // дублировать работу — оба правила пытались позиционировать .header-controls,
+  // что приводило к двум видимым «троеточиям» на разных позициях.
+  // Оставляем только cleanup для уже existing __kpiDotsCleanup рефов
+  // (старые DOM listeners из прошлых mount'ов), без новой DOM-манипуляции.
   // Keep the three-dot menu (⋮) accessible but hide title text and wrapper chrome
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
 
-    // Inject global CSS once for all KPI Card instances
+    // Cleanup old style tag from previous build — universal CSS in
+    // DashboardBuilder.tsx now handles everything (chrome reset +
+    // dot-menu in-card positioning + hover reveal). Per-instance DOM
+    // manipulation conflicted with the global rules and produced two
+    // visible dot-menus. The old code is left below as commented
+    // reference (typecheck-safe via `false &&`).
     const STYLE_ID = 'kpi-card-superset-wrapper-reset';
-    if (!document.getElementById(STYLE_ID)) {
+    document.getElementById(STYLE_ID)?.remove();
+    return undefined;
+
+    // eslint-disable-next-line no-unreachable, no-constant-condition
+    if (false) {
       const style = document.createElement('style');
       style.id = STYLE_ID;
       style.textContent = `
