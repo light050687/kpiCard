@@ -116,17 +116,13 @@ formatValueA, formatValueB, formatDelta, detailTopN, detailPageSize, mockModeEna
         const el = rootRef.current;
         if (!el)
             return;
-        // Cleanup old style tag from previous build — universal CSS in
-        // DashboardBuilder.tsx now handles everything (chrome reset +
-        // dot-menu in-card positioning + hover reveal). Per-instance DOM
-        // manipulation conflicted with the global rules and produced two
-        // visible dot-menus. The old code is left below as commented
-        // reference (typecheck-safe via `false &&`).
+        // Inject global CSS once for all KPI Card instances.
+        // RESTORED: Юзер хочет dot-menu СНАРУЖИ Card (top:6 right:-6),
+        // как было до коммита dee3b0d. Universal CSS в DashboardBuilder.tsx
+        // теперь exclude'ит ext-kpi-card из dot-menu правил, поэтому здесь
+        // injected style снова рулит позиционированием для KPI индивидуально.
         const STYLE_ID = 'kpi-card-superset-wrapper-reset';
-        document.getElementById(STYLE_ID)?.remove();
-        return undefined;
-        // eslint-disable-next-line no-unreachable, no-constant-condition
-        if (false) {
+        if (!document.getElementById(STYLE_ID)) {
             const style = document.createElement('style');
             style.id = STYLE_ID;
             style.textContent = `
