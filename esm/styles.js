@@ -176,13 +176,12 @@ export const Card = styled.div `
   cursor: ${({ clickable }) => (clickable ? 'pointer' : 'default')};
   transition: border-color 0.25s ${EASE};
   animation-name: kpi-card-in;
-  animation-duration: 0.6s;
+  animation-duration: 0.85s;
   animation-timing-function: ${EASE};
   animation-fill-mode: both;
 
-  &:hover {
-    border-color: var(--g200);
-  }
+  /* DS 2.0: card border убран и в idle, и в hover — outer ResizableContainer
+     уже даёт визуальную границу. Тень не используется по дизайн-документу. */
 
   @container kpi (max-width: 400px) {
     padding: 14px 12px;
@@ -388,15 +387,22 @@ export const CardTitle = styled.div `
 `;
 /* ── Toggle ── */
 export const ToggleGroup = styled.div `
+  /* Размер 1-в-1 с donut UnitToggle (drilldownDonut/src/styles.ts) —
+     юзер хочет одинаковые «бейджи» переключателей у всех ext-* плагинов.
+     box-sizing: border-box + height 30px — гарантирует одинаковую
+     внешнюю высоту независимо от content-box default. */
+  box-sizing: border-box;
   display: flex;
   gap: 2px;
   background: var(--g100);
+  border: 1px solid var(--g200);
   border-radius: 6px;
   padding: 2px;
+  height: 30px;
   animation-name: kpi-fade-in;
-  animation-duration: 0.3s;
+  animation-duration: 0.45s;
   animation-timing-function: ${EASE};
-  animation-delay: 0.3s;
+  animation-delay: 0.45s;
   animation-fill-mode: both;
 
   flex-shrink: 0;
@@ -407,23 +413,34 @@ export const ToggleGroup = styled.div `
   }
 `;
 export const ToggleButton = styled.button `
-  /* DS v2.0 fluid: --fs-micro (11-13) для UPPERCASE-кнопок переключения */
+  /* Active state и размеры синхронизированы с donut UnitToggle button:
+     фон --c-sky, текст --s. DS 2.0 — без тени.
+     box-sizing: border-box + height 24px = ToggleGroup-height(30) -
+     padding(2*2) = 26 - border(2*1)... — точное совпадение visual */
+  box-sizing: border-box;
   border: none;
-  background: ${({ active }) => (active ? 'var(--s)' : 'transparent')};
+  background: ${({ active }) => (active ? 'var(--c-sky)' : 'transparent')};
   font-family: var(--m);
   font-size: var(--fs-micro);
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g400)')};
-  padding: 4px 10px;
+  color: ${({ active }) => (active ? 'var(--s)' : 'var(--g500)')};
+  padding: 0 11px;
+  height: 24px;
+  min-width: 28px;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ${EASE};
   line-height: 1;
 
   &:hover {
-    color: ${({ active }) => (active ? 'var(--ink)' : 'var(--g600)')};
+    color: ${({ active }) => (active ? 'var(--s)' : 'var(--ink)')};
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--c-sky);
+    outline-offset: 2px;
   }
 `;
 /* ── Data layers (toggle transition via inline style) ── */
@@ -477,9 +494,9 @@ export const Subtitle = styled.div `
   color: var(--g600);
   margin-bottom: 14px;
   animation-name: kpi-sub-in;
-  animation-duration: 0.5s;
+  animation-duration: 0.7s;
   animation-timing-function: ${EASE};
-  animation-delay: 0.4s;
+  animation-delay: 0.55s;
   animation-fill-mode: both;
 
   @container kpi (max-width: 428px) {
@@ -495,9 +512,9 @@ export const ComparisonSection = styled.div `
   position: relative;
   margin-top: auto;
   animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-cmp-in'};
-  animation-duration: 0.5s;
+  animation-duration: 0.7s;
   animation-timing-function: ${EASE};
-  animation-delay: 0.55s;
+  animation-delay: 0.75s;
   animation-fill-mode: both;
 
   &::before {
@@ -510,9 +527,9 @@ export const ComparisonSection = styled.div `
     background: var(--g100);
     transform-origin: left;
     animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-line-in'};
-    animation-duration: 0.4s;
+    animation-duration: 0.55s;
     animation-timing-function: ${EASE};
-    animation-delay: 0.5s;
+    animation-delay: 0.7s;
     animation-fill-mode: both;
   }
 
@@ -566,9 +583,9 @@ export const DeltaPill = styled.span `
   border-radius: 6px;
   white-space: nowrap;
   animation-name: ${({ skipAnimation }) => skipAnimation ? 'none' : 'kpi-pill-pop'};
-  animation-duration: 0.45s;
+  animation-duration: 0.6s;
   animation-timing-function: ${EASE};
-  animation-delay: 0.7s;
+  animation-delay: 0.95s;
   animation-fill-mode: both;
   transition: background 0.2s ${EASE};
 
